@@ -1,0 +1,23 @@
+[
+  {
+    "word": "textbook",
+    "phonetic": "/ˈtekstbʊk/",
+    "pos": "n.",
+    "meaning": "教科书；课本",
+    "example": "This is an English textbook."
+  },
+  {
+    "word": "conversation",
+    "phonetic": "/ˌkɒnvəˈseɪʃn/",
+    "pos": "n.",
+    "meaning": "交谈；谈话",
+    "example": "We had a conversation about the project."
+  },
+  {
+    "word": "aloud",
+    "phonetic": "/əˈlaʊd/",
+    "pos": "adv.",
+    "meaning": "大声地；出声地",
+    "example": "Please read the text aloud."
+  }
+]
