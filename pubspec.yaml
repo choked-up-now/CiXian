@@ -1,5 +1,5 @@
 name: cixian
-description: "词冼 - 背单词软件（V0.0.1）"
+description: "词冼 - 背单词软件"
 publish_to: 'none'
 version: 0.1.0+2
 
@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

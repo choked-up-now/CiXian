@@ -1,17 +1,38 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import 'daily_learning_screen.dart';
+import 'wordbook_manager_screen.dart';
 
 class WordListScreen extends StatelessWidget {
   final List<Word> words;
+  final void Function(List<Word>) onWordsChanged;
 
-  const WordListScreen({Key? key, required this.words}) : super(key: key);
+  const WordListScreen(
+      {Key? key, required this.words, required this.onWordsChanged})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('词冼 · 九上外研版'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu_book),
+            tooltip: '词书管理',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WordbookManagerScreen(
+                    currentWords: words,
+                    onWordsChanged: onWordsChanged,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: ListView.builder(
         itemCount: words.length,

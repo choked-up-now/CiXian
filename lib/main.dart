@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'data/wordbook_loader.dart';
+import 'data/wordbook_storage.dart';
 import 'models/word.dart';
 import 'screens/word_list_screen.dart';
+import 'screens/wordbook_manager_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,32 +32,50 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late Future<List<Word>> _wordsFuture;
+  List<Word> _words = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    // 加载默认词书（外研版九上）
-    _wordsFuture = WordbookLoader.loadWordbook('assets/wordbooks/waiyan_9_upper.json');
+    _loadWords();
+  }
+
+  Future<List<Word>> _loadWordsHelper() async {
+    // 尝试加载自定义词书
+    final custom = await WordbookStorage.loadWordbook();
+    if (custom != null && custom.isNotEmpty) {
+      return custom;
+    }
+    // 否则加载内置默认词书
+    return await WordbookLoader.loadWordbook(
+        'assets/wordbooks/waiyan_9_upper.json');
+  }
+
+  Future<void> _loadWords() async {
+    final words = await _loadWordsHelper();
+    setState(() {
+      _words = words;
+      _loading = false;
+    });
+  }
+
+  void _updateWords(List<Word> newWords) {
+    setState(() {
+      _words = newWords;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Word>>(
-      future: _wordsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        } else if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(child: Text('加载词书失败: ${snapshot.error}')),
-          );
-        } else {
-          return WordListScreen(words: snapshot.data!);
-        }
-      },
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return WordListScreen(
+      words: _words,
+      onWordsChanged: _updateWords,
     );
   }
 }
