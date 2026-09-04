@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
+import 'daily_learning_screen.dart';
 
 class WordListScreen extends StatelessWidget {
   final List<Word> words;
@@ -34,11 +35,9 @@ class WordListScreen extends StatelessWidget {
                     children: [
                       if (word.phonetic.isNotEmpty)
                         Text('音标: ${word.phonetic}'),
-                      if (word.pos.isNotEmpty)
-                        Text('词性: ${word.pos}'),
+                      if (word.pos.isNotEmpty) Text('词性: ${word.pos}'),
                       Text('释义: ${word.meaning}'),
-                      if (word.example.isNotEmpty)
-                        Text('例句: ${word.example}'),
+                      if (word.example.isNotEmpty) Text('例句: ${word.example}'),
                     ],
                   ),
                   actions: [
@@ -52,6 +51,18 @@ class WordListScreen extends StatelessWidget {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DailyLearningScreen(allWords: words),
+            ),
+          );
+        },
+        icon: const Icon(Icons.school),
+        label: const Text('开始今日学习'),
       ),
     );
   }

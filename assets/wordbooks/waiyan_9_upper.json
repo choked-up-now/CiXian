@@ -19,5 +19,54 @@
     "pos": "adv.",
     "meaning": "大声地；出声地",
     "example": "Please read the text aloud."
+  },
+  {
+    "word": "pronounce",
+    "phonetic": "/prəˈnaʊns/",
+    "pos": "v.",
+    "meaning": "发音；读（音）",
+    "example": "How do you pronounce this word?"
+  },
+  {
+    "word": "patient",
+    "phonetic": "/ˈpeɪʃnt/",
+    "pos": "adj.",
+    "meaning": "有耐心的；病人",
+    "example": "The teacher is patient with us."
+  },
+  {
+    "word": "discover",
+    "phonetic": "/dɪˈskʌvə(r)/",
+    "pos": "v.",
+    "meaning": "发现；发觉",
+    "example": "I discovered a new way to learn English."
+  },
+  {
+    "word": "secret",
+    "phonetic": "/ˈsiːkrət/",
+    "pos": "n.",
+    "meaning": "秘密；秘诀",
+    "example": "The secret to success is hard work."
+  },
+  {
+    "word": "grammar",
+    "phonetic": "/ˈɡræmə(r)/",
+    "pos": "n.",
+    "meaning": "语法；语法规则",
+    "example": "English grammar is not too difficult."
+  },
+  {
+    "word": "ability",
+    "phonetic": "/əˈbɪləti/",
+    "pos": "n.",
+    "meaning": "能力；才能",
+    "example": "She has the ability to solve problems."
+  },
+  {
+    "word": "repeat",
+    "phonetic": "/rɪˈpiːt/",
+    "pos": "v.",
+    "meaning": "重复；重说",
+    "example": "Please repeat the sentence after me."
   }
 ]
