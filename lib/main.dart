@@ -62,7 +62,12 @@ class _HomePageState extends State<HomePage> {
 
   void _updateWords(List<Word> newWords) {
     setState(() {
-      _words = newWords;
+      if (newWords.isEmpty) {
+        // 如果是清除数据，重新加载默认词书
+        _loadWords();
+      } else {
+        _words = newWords;
+      }
     });
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/word.dart';
 import 'daily_learning_screen.dart';
 import 'wordbook_manager_screen.dart';
+import 'settings_screen.dart';
 
 class WordListScreen extends StatelessWidget {
   final List<Word> words;
@@ -17,6 +18,21 @@ class WordListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('词冼 · 九上外研版'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: '设置',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(
+                    currentWords: words,
+                    onWordsChanged: onWordsChanged,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.menu_book),
             tooltip: '词书管理',
@@ -39,10 +55,8 @@ class WordListScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final word = words[index];
           return ListTile(
-            title: Text(
-              word.word,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            title: Text(word.word,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(word.meaning),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
