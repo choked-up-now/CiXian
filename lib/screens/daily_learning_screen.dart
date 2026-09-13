@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 
 import '../models/word.dart';
+import '../data/wrong_words_storage.dart';
 
 class DailyLearningScreen extends StatefulWidget {
   final List<Word> allWords;
+  final List<Word>? poolWords; // 可选：用于生成干扰项的词池
 
-  const DailyLearningScreen({Key? key, required this.allWords})
+  const DailyLearningScreen({Key? key, required this.allWords, this.poolWords})
       : super(key: key);
 
   @override
@@ -14,15 +16,15 @@ class DailyLearningScreen extends StatefulWidget {
 }
 
 class _DailyLearningScreenState extends State<DailyLearningScreen> {
-  // 本次学习目标单词数量（可后续设置）
   static const int _targetCount = 10;
 
-  late List<Word> _studyWords; // 本次要考的单词
-  late List<_Question> _questions; // 生成的题目列表
-  int _currentIndex = 0; // 当前题号
-  int _score = 0; // 答对数量
-  bool _answered = false; // 当前题目是否已作答
-  int? _selectedOption; // 用户选择的选项索引
+  late List<Word> _studyWords;
+  late List<_Question> _questions;
+  int _currentIndex = 0;
+  int _score = 0;
+  bool _answered = false;
+  int? _selectedOption;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -30,26 +32,28 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     _prepareQuestions();
   }
 
-  // 随机抽词并生成题目
   void _prepareQuestions() {
     final random = Random();
-    // 从所有词中随机选出 targetCount 个（不够则全用）
+    final pool = widget.poolWords ?? widget.allWords;
+
+    final uniqueMeanings = pool.map((e) => e.meaning).toSet().toList();
+    if (uniqueMeanings.length < 4) {
+      setState(() {
+        _errorMessage = '词库单词太少，无法生成四选一题目（至少需要4个不同释义）。';
+      });
+      return;
+    }
+
     final shuffled = List<Word>.from(widget.allWords)..shuffle(random);
     _studyWords = shuffled.take(min(_targetCount, shuffled.length)).toList();
 
-    // 为每个单词生成四选一题目
     _questions = _studyWords.map((word) {
-      // 生成三个干扰项（从其他单词的释义中随机选，确保不重复）
-      final wrongMeanings = <String>{};
-      while (wrongMeanings.length < 3) {
-        final candidate =
-            widget.allWords[random.nextInt(widget.allWords.length)].meaning;
-        if (candidate != word.meaning) {
-          wrongMeanings.add(candidate);
-        }
-      }
-      // 合并正确选项和干扰选项，打乱顺序
-      final options = [word.meaning, ...wrongMeanings]..shuffle(random);
+      final wrongMeanings = uniqueMeanings
+          .where((m) => m != word.meaning)
+          .toList()
+        ..shuffle(random);
+      final selectedWrong = wrongMeanings.take(3).toList();
+      final options = [word.meaning, ...selectedWrong]..shuffle(random);
       return _Question(
         word: word,
         options: options,
@@ -58,15 +62,19 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     }).toList();
   }
 
-  void _answer(int index) {
+  void _answer(int index) async {
     if (_answered) return;
+    final isCorrect = index == _questions[_currentIndex].correctIndex;
     setState(() {
       _answered = true;
       _selectedOption = index;
-      if (index == _questions[_currentIndex].correctIndex) {
-        _score++;
-      }
+      if (isCorrect) _score++;
     });
+
+    // 答错时自动记录到错题本
+    if (!isCorrect) {
+      await WrongWordsStorage.addWrongWord(_questions[_currentIndex].word);
+    }
   }
 
   void _next() {
@@ -77,7 +85,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
         _selectedOption = null;
       });
     } else {
-      // 完成所有题目，显示结果对话框
       _showResult();
     }
   }
@@ -87,13 +94,13 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('今日学习完成！'),
+        title: const Text('学习完成！'),
         content: Text('答对 $_score / ${_questions.length} 题'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.pop(context); // 返回主页
+              Navigator.pop(context);
             },
             child: const Text('返回'),
           ),
@@ -104,6 +111,22 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('每日学习')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, color: Colors.red),
+            ),
+          ),
+        ),
+      );
+    }
+
     final question = _questions[_currentIndex];
     return Scaffold(
       appBar: AppBar(
@@ -114,14 +137,12 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 进度条
             LinearProgressIndicator(
               value: (_currentIndex + 1) / _questions.length,
               minHeight: 8,
               backgroundColor: Colors.grey[300],
             ),
             const SizedBox(height: 24),
-            // 题干：英文单词
             Text(
               question.word.word,
               style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
@@ -134,7 +155,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            // 选项列表
             ...List.generate(question.options.length, (index) {
               final option = question.options[index];
               final isCorrect = index == question.correctIndex;
@@ -174,7 +194,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
               );
             }),
             const Spacer(),
-            // 下一题按钮（答完才显示）
             if (_answered)
               ElevatedButton(
                 onPressed: _next,
@@ -194,7 +213,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
   }
 }
 
-// 题目数据结构
 class _Question {
   final Word word;
   final List<String> options;

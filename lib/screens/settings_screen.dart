@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/word.dart';
 import '../data/wordbook_storage.dart';
+import '../data/wrong_words_storage.dart';
 
 class SettingsScreen extends StatefulWidget {
   final List<Word> currentWords;
@@ -18,7 +19,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // 清理缓存（模拟）
   void _clearCache() {
-    // 这里可以调用 path_provider 清理临时目录，但先做一个简单的提示
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -49,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               await WordbookStorage.clearWordbook();
-              // 通知主页重新加载默认词书
               widget.onWordsChanged([]); // 传空列表，主页会重新从 assets 加载默认词书
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -57,6 +56,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
             child: const Text('确定清除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 清空错题本
+  void _clearWrongBook() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清空错题本'),
+        content: const Text('确定要清空所有错题记录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await WrongWordsStorage.clearAll();
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('错题本已清空')),
+                );
+              }
+            },
+            child: const Text('确定'),
           ),
         ],
       ),
@@ -121,9 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final words = list
                     .map((e) => Word.fromJson(e as Map<String, dynamic>))
                     .toList();
-                // 保存到本地
                 WordbookStorage.saveWordbook(words);
-                // 通知主页更新
                 widget.onWordsChanged(words);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -160,6 +186,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('清除自定义词书，恢复默认词书'),
             onTap: _clearData,
           ),
+          ListTile(
+            leading: const Icon(Icons.book),
+            title: const Text('清空错题本'),
+            subtitle: const Text('删除所有答错的单词记录'),
+            onTap: _clearWrongBook,
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.ios_share),
             title: const Text('迁移设备（导出）'),

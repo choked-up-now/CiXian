@@ -3,6 +3,7 @@ import '../models/word.dart';
 import 'daily_learning_screen.dart';
 import 'wordbook_manager_screen.dart';
 import 'settings_screen.dart';
+import 'wrong_book_screen.dart';
 
 class WordListScreen extends StatelessWidget {
   final List<Word> words;
@@ -18,6 +19,18 @@ class WordListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('词冼 · 九上外研版'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.book),
+            tooltip: '错题本',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WrongBookScreen(allWords: words),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: '设置',
