@@ -3,13 +3,17 @@ import 'dart:math';
 
 import '../models/word.dart';
 import '../data/wrong_words_storage.dart';
+import '../data/tts_service.dart';
 
 class DailyLearningScreen extends StatefulWidget {
   final List<Word> allWords;
   final List<Word>? poolWords; // 可选：用于生成干扰项的词池
 
-  const DailyLearningScreen({Key? key, required this.allWords, this.poolWords})
-      : super(key: key);
+  const DailyLearningScreen({
+    Key? key,
+    required this.allWords,
+    this.poolWords,
+  }) : super(key: key);
 
   @override
   State<DailyLearningScreen> createState() => _DailyLearningScreenState();
@@ -84,6 +88,8 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
         _answered = false;
         _selectedOption = null;
       });
+      // 自动朗读新题目
+      TtsService().speak(_questions[_currentIndex].word.word);
     } else {
       _showResult();
     }
@@ -143,10 +149,23 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
               backgroundColor: Colors.grey[300],
             ),
             const SizedBox(height: 24),
-            Text(
-              question.word.word,
-              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  question.word.word,
+                  style: const TextStyle(
+                      fontSize: 36, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.volume_up, size: 32),
+                  tooltip: '朗读',
+                  onPressed: () {
+                    TtsService().speak(question.word.word);
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
@@ -185,8 +204,9 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                          child: Text(option,
-                              style: const TextStyle(fontSize: 18))),
+                        child:
+                            Text(option, style: const TextStyle(fontSize: 18)),
+                      ),
                       if (icon != null) Icon(icon),
                     ],
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
+import '../data/tts_service.dart';
 import 'daily_learning_screen.dart';
 import 'wordbook_manager_screen.dart';
 import 'settings_screen.dart';
@@ -9,9 +10,11 @@ class WordListScreen extends StatelessWidget {
   final List<Word> words;
   final void Function(List<Word>) onWordsChanged;
 
-  const WordListScreen(
-      {Key? key, required this.words, required this.onWordsChanged})
-      : super(key: key);
+  const WordListScreen({
+    Key? key,
+    required this.words,
+    required this.onWordsChanged,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -68,15 +71,28 @@ class WordListScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final word = words[index];
           return ListTile(
-            title: Text(word.word,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              word.word,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text(word.meaning),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: Text(word.word),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(word.word)),
+                      IconButton(
+                        icon: const Icon(Icons.volume_up),
+                        tooltip: '朗读',
+                        onPressed: () {
+                          TtsService().speak(word.word);
+                        },
+                      ),
+                    ],
+                  ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
