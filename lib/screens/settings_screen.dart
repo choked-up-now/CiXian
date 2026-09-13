@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/word.dart';
 import '../data/wordbook_storage.dart';
 import '../data/wrong_words_storage.dart';
+import '../data/version_checker.dart';
 
 class SettingsScreen extends StatefulWidget {
   final List<Word> currentWords;
   final Function(List<Word>) onWordsChanged;
 
-  const SettingsScreen(
-      {Key? key, required this.currentWords, required this.onWordsChanged})
-      : super(key: key);
+  const SettingsScreen({
+    Key? key,
+    required this.currentWords,
+    required this.onWordsChanged,
+  }) : super(key: key);
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -49,11 +53,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               await WordbookStorage.clearWordbook();
-              widget.onWordsChanged([]); // 传空列表，主页会重新从 assets 加载默认词书
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('自定义词书已清除，已恢复默认词书')),
-              );
+              widget.onWordsChanged([]);
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('自定义词书已清除，已恢复默认词书')),
+                );
+              }
             },
             child: const Text('确定清除'),
           ),
@@ -89,6 +95,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  // 检查更新
+  void _checkUpdate() async {
+    // 弹出加载框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final result = await VersionChecker.check();
+
+    if (!mounted) return;
+    Navigator.pop(context); // 关闭加载框
+
+    if (result.error != null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('检查失败'),
+          content: Text(result.error!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('好的'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (result.hasUpdate) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('发现新版本 🎉'),
+          content: Text(
+            '当前版本：${result.currentVersion}\n'
+            '最新版本：${result.latestVersion}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('稍后'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final url = result.androidUrl.isNotEmpty
+                    ? result.androidUrl
+                    : result.releaseUrl;
+                if (url.isNotEmpty) {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                }
+              },
+              child: const Text('去下载'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('已是最新版本'),
+          content: Text('当前版本：${result.currentVersion}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('好的'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // 导出当前词书为 JSON
@@ -175,6 +261,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           ListTile(
+            leading: const Icon(Icons.system_update),
+            title: const Text('检查更新'),
+            subtitle: const Text('查看是否有新版本'),
+            onTap: _checkUpdate,
+          ),
+          ListTile(
             leading: const Icon(Icons.cleaning_services),
             title: const Text('缓存清理'),
             subtitle: const Text('清理临时文件，释放空间'),
@@ -204,6 +296,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('迁移设备（导入）'),
             subtitle: const Text('从其他设备导入 JSON 词书'),
             onTap: _importWords,
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              '词冼 CiXian\n一个极简背单词软件\n基于 Apache License 2.0 开源',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ),
         ],
       ),
