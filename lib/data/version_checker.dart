@@ -3,16 +3,12 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
 class VersionChecker {
-  // ⚠️ 这里已经按你的仓库信息填好，如需更换仓库请修改
-  static const String _owner = 'choked-up-now';
-  static const String _repo = 'CiXian';
-
-  static const String _apiUrl =
-      'https://api.atomgit.com/api/v5/repos/$_owner/$_repo/releases/latest';
+  // 从自己的网站读取版本信息（自动跟随 Cloudflare Pages 部署）
+  static const String _versionUrl = 'https://cixian.pages.dev/version.json';
 
   static Future<VersionCheckResult> check() async {
     try {
-      final response = await http.get(Uri.parse(_apiUrl));
+      final response = await http.get(Uri.parse(_versionUrl));
 
       if (response.statusCode != 200) {
         return VersionCheckResult(
@@ -21,22 +17,9 @@ class VersionChecker {
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-
-      // 从 tag_name 获取最新版本号（例如 "v0.5.0"）
-      final latestTag = data['tag_name'] as String? ?? '';
-      final latestVersion =
-          latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
-
-      // 从 assets 里找 APK 下载链接
-      final assets = data['assets'] as List<dynamic>? ?? [];
-      String apkUrl = '';
-      for (final asset in assets) {
-        final assetName = asset['name'] as String? ?? '';
-        if (assetName.endsWith('.apk')) {
-          apkUrl = asset['browser_download_url'] as String? ?? '';
-          break;
-        }
-      }
+      final latestVersion = data['version'] as String? ?? '';
+      final androidUrl = data['android_url'] as String? ?? '';
+      final releaseUrl = data['release_url'] as String? ?? '';
 
       final info = await PackageInfo.fromPlatform();
       final currentVersion = info.version;
@@ -47,8 +30,8 @@ class VersionChecker {
         hasUpdate: hasUpdate,
         currentVersion: currentVersion,
         latestVersion: latestVersion,
-        androidUrl: apkUrl,
-        releaseUrl: 'https://atomgit.com/$_owner/$_repo/releases',
+        androidUrl: androidUrl,
+        releaseUrl: releaseUrl,
       );
     } catch (e) {
       return VersionCheckResult(error: '检查更新失败: $e');
