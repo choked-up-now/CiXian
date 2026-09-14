@@ -5,6 +5,7 @@ import '../models/word.dart';
 import '../data/wordbook_storage.dart';
 import '../data/wrong_words_storage.dart';
 import '../data/version_checker.dart';
+import '../data/tts_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final List<Word> currentWords;
@@ -99,7 +100,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 检查更新
   void _checkUpdate() async {
-    // 弹出加载框
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -109,7 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await VersionChecker.check();
 
     if (!mounted) return;
-    Navigator.pop(context); // 关闭加载框
+    Navigator.pop(context);
 
     if (result.error != null) {
       showDialog(
@@ -175,6 +175,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     }
+  }
+
+  // 语速设置对话框
+  void _showRateDialog() {
+    double tempRate = TtsService().rate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('语速设置'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('当前语速：${tempRate.toStringAsFixed(2)}'),
+              Slider(
+                value: tempRate,
+                min: 0.2,
+                max: 1.0,
+                divisions: 16,
+                label: tempRate.toStringAsFixed(2),
+                onChanged: (value) {
+                  setDialogState(() {
+                    tempRate = value;
+                  });
+                },
+                onChangeEnd: (value) async {
+                  await TtsService().setRate(value);
+                },
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: () {
+                  TtsService().speak('Hello everyone');
+                },
+                icon: const Icon(Icons.volume_up),
+                label: const Text('试听：Hello everyone'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('完成'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // 导出当前词书为 JSON
@@ -265,6 +314,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('检查更新'),
             subtitle: const Text('查看是否有新版本'),
             onTap: _checkUpdate,
+          ),
+          ListTile(
+            leading: const Icon(Icons.speed),
+            title: const Text('语速设置'),
+            subtitle: const Text('调整发音速度，可试听'),
+            onTap: _showRateDialog,
           ),
           ListTile(
             leading: const Icon(Icons.cleaning_services),
