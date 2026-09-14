@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import '../models/word.dart';
 import '../data/wordbook_storage.dart';
 import '../data/wrong_words_storage.dart';
 import '../data/version_checker.dart';
 import '../data/tts_service.dart';
+import '../data/apk_downloader.dart';
 
 class SettingsScreen extends StatefulWidget {
   final List<Word> currentWords;
@@ -22,7 +24,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // 清理缓存（模拟）
   void _clearCache() {
     showDialog(
       context: context,
@@ -39,7 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 清除自定义词书数据（恢复默认）
   void _clearData() {
     showDialog(
       context: context,
@@ -69,7 +69,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 清空错题本
   void _clearWrongBook() {
     showDialog(
       context: context,
@@ -148,11 +147,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final url = result.androidUrl.isNotEmpty
                     ? result.androidUrl
                     : result.releaseUrl;
-                if (url.isNotEmpty) {
+
+                if (kIsWeb) {
+                  // Web 端不支持应用内安装，直接跳浏览器
                   final uri = Uri.parse(url);
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
+                } else {
+                  // Android 端：应用内下载 + 安装
+                  await _downloadAndInstall(url);
                 }
               },
               child: const Text('去下载'),
@@ -173,6 +177,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      );
+    }
+  }
+
+  // Android 端：下载并安装 APK
+  Future<void> _downloadAndInstall(String url) async {
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('下载链接无效')),
+      );
+      return;
+    }
+
+    final progress = ValueNotifier<double>(0);
+    bool isClosing = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('正在下载更新'),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progress,
+          builder: (context, value, _) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: value == 0 ? null : value),
+                const SizedBox(height: 12),
+                Text('${(value * 100).toStringAsFixed(0)}%'),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              isClosing = true;
+              Navigator.pop(context);
+            },
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+
+    final error = await ApkDownloader.downloadAndInstall(
+      url: url,
+      onProgress: (p) => progress.value = p,
+    );
+
+    if (!mounted) return;
+    if (!isClosing) {
+      Navigator.pop(context); // 关闭进度对话框
+    }
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
       );
     }
   }
@@ -226,7 +289,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 导出当前词书为 JSON
   void _exportWords() {
     final jsonString = jsonEncode(widget.currentWords
         .map((e) => {
@@ -257,7 +319,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 导入 JSON 词书
   void _importWords() {
     final controller = TextEditingController();
     showDialog(
