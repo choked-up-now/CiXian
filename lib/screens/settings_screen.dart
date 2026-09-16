@@ -8,6 +8,7 @@ import '../data/wrong_words_storage.dart';
 import '../data/version_checker.dart';
 import '../data/tts_service.dart';
 import '../data/apk_downloader.dart';
+import '../data/sync_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   final List<Word> currentWords;
@@ -83,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               await WrongWordsStorage.clearAll();
+              SyncManager.scheduleUpload();
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -97,13 +99,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // 云同步开关
+  Future<void> _toggleCloudSync() async {
+    final enabled = await SyncManager.isEnabled();
+
+    if (enabled) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('关闭云同步'),
+          content: const Text('关闭后本地数据仍保留，但不再自动上传到云端。'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('关闭')),
+          ],
+        ),
+      );
+      if (confirm == true) {
+        await SyncManager.disable();
+        if (mounted) setState(() {});
+      }
+      return;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('开启云同步'),
+        content: const Text('请选择：\n\n· 首次开启请选择「新建同步码」\n· 换设备时选择「输入已有同步码」'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'restore'),
+              child: const Text('输入同步码')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'new'),
+              child: const Text('新建同步码')),
+        ],
+      ),
+    );
+
+    if (choice == 'new') {
+      try {
+        final code = await SyncManager.enableAndRegister();
+        if (mounted) {
+          setState(() {});
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('云同步已开启 🎉'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('这是你的同步码，请妥善保存：'),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    code,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '换设备时输入这个同步码即可恢复数据。',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('我知道了')),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('开启失败：$e')),
+          );
+        }
+      }
+    } else if (choice == 'restore') {
+      final controller = TextEditingController();
+      final code = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('输入同步码'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: '例如：ABC-DEF-123'),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('恢复')),
+          ],
+        ),
+      );
+      if (code != null && code.trim().isNotEmpty) {
+        try {
+          await SyncManager.bindWithCode(code);
+          if (mounted) {
+            setState(() {});
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已恢复云端数据')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('恢复失败：$e')),
+            );
+          }
+        }
+      }
+    }
+  }
+
   // 检查更新（带"接收测试版本"选项）
   void _checkUpdate() async {
     final acceptPre = await VersionChecker.isAcceptPreRelease();
 
     if (!mounted) return;
 
-    // 先弹一个小对话框，让用户决定是否接收测试版本
     final shouldCheck = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -140,7 +267,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (shouldCheck != true) return;
 
-    // 显示加载
     if (!mounted) return;
     showDialog(
       context: context,
@@ -195,8 +321,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (kIsWeb) {
                   final uri = Uri.parse(url);
                   if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri,
-                        mode: LaunchMode.externalApplication);
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 } else {
                   await _downloadAndInstall(url);
@@ -309,6 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
                 onChangeEnd: (value) async {
                   await TtsService().setRate(value);
+                  SyncManager.scheduleUpload();
                 },
               ),
               const SizedBox(height: 8),
@@ -333,13 +459,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _exportWords() {
-    final jsonString = jsonEncode(widget.currentWords.map((e) => {
-      'word': e.word,
-      'phonetic': e.phonetic,
-      'pos': e.pos,
-      'meaning': e.meaning,
-      'example': e.example,
-    }).toList());
+    final jsonString = jsonEncode(widget.currentWords
+        .map((e) => {
+              'word': e.word,
+              'phonetic': e.phonetic,
+              'pos': e.pos,
+              'meaning': e.meaning,
+              'example': e.example,
+            })
+        .toList());
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -416,6 +544,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('检查更新'),
             subtitle: const Text('查看是否有新版本'),
             onTap: _checkUpdate,
+          ),
+          FutureBuilder<bool>(
+            future: SyncManager.isEnabled(),
+            builder: (context, snapshot) {
+              final enabled = snapshot.data ?? false;
+              return ListTile(
+                leading: Icon(enabled ? Icons.cloud_done : Icons.cloud_off),
+                title: const Text('云同步'),
+                subtitle: Text(enabled ? '已开启，学习进度自动同步' : '未开启，点击启用多设备同步'),
+                onTap: _toggleCloudSync,
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.speed),

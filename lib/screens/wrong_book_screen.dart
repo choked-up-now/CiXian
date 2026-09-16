@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../data/wrong_words_storage.dart';
+import '../data/sync_manager.dart';
 import 'daily_learning_screen.dart';
 
 class WrongBookScreen extends StatefulWidget {
-  final List<Word> allWords; // 用于生成干扰项的完整词库
+  final List<Word> allWords;
 
   const WrongBookScreen({Key? key, required this.allWords}) : super(key: key);
 
@@ -32,6 +33,7 @@ class _WrongBookScreenState extends State<WrongBookScreen> {
 
   Future<void> _remove(Word word) async {
     await WrongWordsStorage.removeWord(word.word);
+    SyncManager.scheduleUpload();
     _load();
   }
 
@@ -53,6 +55,7 @@ class _WrongBookScreenState extends State<WrongBookScreen> {
     );
     if (confirmed == true) {
       await WrongWordsStorage.clearAll();
+      SyncManager.scheduleUpload();
       _load();
     }
   }
@@ -64,10 +67,10 @@ class _WrongBookScreenState extends State<WrongBookScreen> {
       MaterialPageRoute(
         builder: (context) => DailyLearningScreen(
           allWords: _wrongWords,
-          poolWords: widget.allWords, // 用完整词库生成干扰项
+          poolWords: widget.allWords,
         ),
       ),
-    ).then((_) => _load()); // 复习返回后刷新错题本
+    ).then((_) => _load());
   }
 
   @override

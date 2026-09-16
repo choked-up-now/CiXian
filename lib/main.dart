@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'data/wordbook_loader.dart';
 import 'data/wordbook_storage.dart';
+import 'data/sync_manager.dart';
 import 'models/word.dart';
 import 'screens/word_list_screen.dart';
-import 'screens/wordbook_manager_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,9 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '词冼',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: const HomePage(),
     );
   }
@@ -38,16 +36,21 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadWords();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // 云同步：如果已开启，启动时下载云端数据
+    try {
+      await SyncManager.downloadAndApply();
+    } catch (_) {}
+
+    await _loadWords();
   }
 
   Future<List<Word>> _loadWordsHelper() async {
-    // 尝试加载自定义词书
     final custom = await WordbookStorage.loadWordbook();
-    if (custom != null && custom.isNotEmpty) {
-      return custom;
-    }
-    // 否则加载内置默认词书
+    if (custom != null && custom.isNotEmpty) return custom;
     return await WordbookLoader.loadWordbook(
         'assets/wordbooks/waiyan_9_upper.json');
   }
@@ -63,7 +66,6 @@ class _HomePageState extends State<HomePage> {
   void _updateWords(List<Word> newWords) {
     setState(() {
       if (newWords.isEmpty) {
-        // 如果是清除数据，重新加载默认词书
         _loadWords();
       } else {
         _words = newWords;
@@ -74,13 +76,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return WordListScreen(
-      words: _words,
-      onWordsChanged: _updateWords,
-    );
+    return WordListScreen(words: _words, onWordsChanged: _updateWords);
   }
 }

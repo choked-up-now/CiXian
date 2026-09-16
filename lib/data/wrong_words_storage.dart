@@ -34,6 +34,21 @@ class WrongWordsStorage {
     return list.map((e) => Word.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  // 批量覆盖保存（云同步用）
+  static Future<void> saveAll(List<Word> words) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = words
+        .map((e) => {
+              'word': e.word,
+              'phonetic': e.phonetic,
+              'pos': e.pos,
+              'meaning': e.meaning,
+              'example': e.example,
+            })
+        .toList();
+    await prefs.setString(_key, jsonEncode(jsonList));
+  }
+
   // 移除某个错词
   static Future<void> removeWord(String word) async {
     final prefs = await SharedPreferences.getInstance();

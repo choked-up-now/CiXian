@@ -3,11 +3,12 @@ import 'dart:math';
 
 import '../models/word.dart';
 import '../data/wrong_words_storage.dart';
+import '../data/sync_manager.dart';
 import '../data/tts_service.dart';
 
 class DailyLearningScreen extends StatefulWidget {
   final List<Word> allWords;
-  final List<Word>? poolWords; // 可选：用于生成干扰项的词池
+  final List<Word>? poolWords;
 
   const DailyLearningScreen({
     Key? key,
@@ -75,9 +76,10 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       if (isCorrect) _score++;
     });
 
-    // 答错时自动记录到错题本
     if (!isCorrect) {
       await WrongWordsStorage.addWrongWord(_questions[_currentIndex].word);
+      // 触发云同步（防抖）
+      SyncManager.scheduleUpload();
     }
   }
 
@@ -88,7 +90,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
         _answered = false;
         _selectedOption = null;
       });
-      // 自动朗读新题目
       TtsService().speak(_questions[_currentIndex].word.word);
     } else {
       _showResult();
