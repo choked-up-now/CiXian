@@ -97,8 +97,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 检查更新
+  // 检查更新（带"接收测试版本"选项）
   void _checkUpdate() async {
+    final acceptPre = await VersionChecker.isAcceptPreRelease();
+
+    if (!mounted) return;
+
+    // 先弹一个小对话框，让用户决定是否接收测试版本
+    final shouldCheck = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('检查更新'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('接收测试版本'),
+                subtitle: const Text('开启后可收到开发中的抢先版本，可能不够稳定'),
+                value: acceptPre,
+                onChanged: (value) async {
+                  await VersionChecker.setAcceptPreRelease(value);
+                  setDialogState(() {});
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('开始检查'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (shouldCheck != true) return;
+
+    // 显示加载
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -147,15 +190,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final url = result.androidUrl.isNotEmpty
                     ? result.androidUrl
                     : result.releaseUrl;
+                if (url.isEmpty) return;
 
                 if (kIsWeb) {
-                  // Web 端不支持应用内安装，直接跳浏览器
                   final uri = Uri.parse(url);
                   if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    await launchUrl(uri,
+                        mode: LaunchMode.externalApplication);
                   }
                 } else {
-                  // Android 端：应用内下载 + 安装
                   await _downloadAndInstall(url);
                 }
               },
@@ -230,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (!mounted) return;
     if (!isClosing) {
-      Navigator.pop(context); // 关闭进度对话框
+      Navigator.pop(context);
     }
 
     if (error != null) {
@@ -290,15 +333,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _exportWords() {
-    final jsonString = jsonEncode(widget.currentWords
-        .map((e) => {
-              'word': e.word,
-              'phonetic': e.phonetic,
-              'pos': e.pos,
-              'meaning': e.meaning,
-              'example': e.example,
-            })
-        .toList());
+    final jsonString = jsonEncode(widget.currentWords.map((e) => {
+      'word': e.word,
+      'phonetic': e.phonetic,
+      'pos': e.pos,
+      'meaning': e.meaning,
+      'example': e.example,
+    }).toList());
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
