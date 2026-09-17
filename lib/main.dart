@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'data/wordbook_loader.dart';
 import 'data/wordbook_storage.dart';
 import 'data/sync_manager.dart';
 import 'models/word.dart';
@@ -30,7 +29,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Word> _words = [];
+  Wordbook? _book;
   bool _loading = true;
 
   @override
@@ -40,44 +39,33 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _init() async {
-    // 云同步：如果已开启，启动时下载云端数据
+    // 云同步：如果已开启，启动时下载
     try {
       await SyncManager.downloadAndApply();
     } catch (_) {}
 
-    await _loadWords();
+    await _loadBook();
   }
 
-  Future<List<Word>> _loadWordsHelper() async {
-    final custom = await WordbookStorage.loadWordbook();
-    if (custom != null && custom.isNotEmpty) return custom;
-    return await WordbookLoader.loadWordbook(
-        'assets/wordbooks/waiyan_9_upper.json');
-  }
-
-  Future<void> _loadWords() async {
-    final words = await _loadWordsHelper();
+  Future<void> _loadBook() async {
+    await WordbookStorage.ensureDefaultBook();
+    final book = await WordbookStorage.loadCurrent();
     setState(() {
-      _words = words;
+      _book = book;
       _loading = false;
-    });
-  }
-
-  void _updateWords(List<Word> newWords) {
-    setState(() {
-      if (newWords.isEmpty) {
-        _loadWords();
-      } else {
-        _words = newWords;
-      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading || _book == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return WordListScreen(words: _words, onWordsChanged: _updateWords);
+    return WordListScreen(
+      book: _book!,
+      onBookChanged: () async {
+        await _loadBook();
+      },
+    );
   }
 }

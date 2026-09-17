@@ -1,180 +1,211 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import '../models/word.dart';
 import '../data/wordbook_storage.dart';
 
 class WordbookManagerScreen extends StatefulWidget {
-  final List<Word> currentWords;
-  final Function(List<Word>) onWordsChanged;
-
-  const WordbookManagerScreen(
-      {Key? key, required this.currentWords, required this.onWordsChanged})
-      : super(key: key);
+  const WordbookManagerScreen({Key? key}) : super(key: key);
 
   @override
   State<WordbookManagerScreen> createState() => _WordbookManagerScreenState();
 }
 
 class _WordbookManagerScreenState extends State<WordbookManagerScreen> {
-  late List<Word> _words = List.from(widget.currentWords);
+  Map<String, Map<String, dynamic>> _books = {};
+  String _currentId = '';
+  bool _loading = true;
 
-  void _updateParent() {
-    widget.onWordsChanged(_words);
-    WordbookStorage.saveWordbook(_words); // 自动保存
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  // 手动添加单词
-  void _addWordDialog() {
-    final wordCtrl = TextEditingController();
-    final phoneticCtrl = TextEditingController();
-    final posCtrl = TextEditingController();
-    final meaningCtrl = TextEditingController();
-    final exampleCtrl = TextEditingController();
+  Future<void> _load() async {
+    final books = await WordbookStorage.loadAll();
+    final current = await WordbookStorage.currentId();
+    setState(() {
+      _books = books;
+      _currentId = current;
+      _loading = false;
+    });
+  }
 
-    showDialog(
+  Future<void> _switchTo(String id) async {
+    await WordbookStorage.setCurrent(id);
+    _load();
+  }
+
+  Future<void> _addBook() async {
+    final nameCtrl = TextEditingController();
+    final jsonCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('添加单词'),
+        title: const Text('添加词书'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                  controller: wordCtrl,
-                  decoration: const InputDecoration(labelText: '单词 *')),
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                    labelText: '词书名称', hintText: '如：人教版七上'),
+              ),
+              const SizedBox(height: 12),
               TextField(
-                  controller: phoneticCtrl,
-                  decoration: const InputDecoration(labelText: '音标')),
-              TextField(
-                  controller: posCtrl,
-                  decoration: const InputDecoration(labelText: '词性')),
-              TextField(
-                  controller: meaningCtrl,
-                  decoration: const InputDecoration(labelText: '释义 *')),
-              TextField(
-                  controller: exampleCtrl,
-                  decoration: const InputDecoration(labelText: '例句')),
+                controller: jsonCtrl,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  labelText: 'JSON 内容',
+                  hintText: '[{"word":"hello","meaning":"你好"}]',
+                ),
+              ),
             ],
           ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
           TextButton(
-            onPressed: () {
-              final word = wordCtrl.text.trim();
-              final meaning = meaningCtrl.text.trim();
-              if (word.isEmpty || meaning.isEmpty) return;
-              final newWord = Word(
-                word: word,
-                phonetic: phoneticCtrl.text.trim(),
-                pos: posCtrl.text.trim(),
-                meaning: meaning,
-                example: exampleCtrl.text.trim(),
-              );
-              setState(() {
-                _words.add(newWord);
-                _updateParent();
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('添加'),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('添加')),
         ],
       ),
     );
+
+    if (ok != true) return;
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) return;
+
+    try {
+      final raw = jsonCtrl.text.trim();
+      final list = jsonDecode(raw) as List<dynamic>;
+      final words =
+          list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      if (words.isEmpty) throw Exception('词书为空');
+      await WordbookStorage.addBook(name, words);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('添加成功')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败：$e')),
+        );
+      }
+    }
   }
 
-  // 导入 JSON
-  void _importJson() {
-    final jsonCtrl = TextEditingController();
-    showDialog(
+  Future<void> _deleteBook(String id) async {
+    if (id == WordbookStorage.defaultBookId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('默认词书不能删除')),
+      );
+      return;
+    }
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('导入 JSON'),
-        content: TextField(
-          controller: jsonCtrl,
-          maxLines: 8,
-          decoration: const InputDecoration(
-              hintText: '粘贴 JSON 数组，例如 [{"word":"hello","meaning":"你好"}]'),
-        ),
+        title: const Text('删除词书'),
+        content: const Text('删除后该词书的学习记录也会保留，但词书本身将不可恢复。'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
           TextButton(
-            onPressed: () {
-              try {
-                final raw = jsonCtrl.text.trim();
-                final list = jsonDecode(raw) as List<dynamic>;
-                final imported = list
-                    .map((e) => Word.fromJson(e as Map<String, dynamic>))
-                    .toList();
-                setState(() {
-                  _words.addAll(imported);
-                  _updateParent();
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('导入成功！')));
-              } catch (e) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('JSON 格式错误')));
-              }
-            },
-            child: const Text('导入'),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('删除')),
         ],
       ),
     );
+    if (confirm != true) return;
+    await WordbookStorage.deleteBook(id);
+    await _load();
+  }
+
+  Future<void> _renameBook(String id, String oldName) async {
+    final ctrl = TextEditingController(text: oldName);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重命名词书'),
+        content: TextField(controller: ctrl),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final newName = ctrl.text.trim();
+    if (newName.isEmpty) return;
+    await WordbookStorage.renameBook(id, newName);
+    await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('词书管理')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               children: [
-                ElevatedButton.icon(
-                  onPressed: _addWordDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('添加单词'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _importJson,
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('导入 JSON'),
+                for (final entry in _books.entries)
+                  _buildBookTile(entry.key, entry.value),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ElevatedButton.icon(
+                    onPressed: _addBook,
+                    icon: const Icon(Icons.add),
+                    label: const Text('添加新词书'),
+                  ),
                 ),
               ],
             ),
-          ),
-          const Divider(),
-          Expanded(
-            child: _words.isEmpty
-                ? const Center(child: Text('暂无单词，请添加'))
-                : ListView.builder(
-                    itemCount: _words.length,
-                    itemBuilder: (context, index) {
-                      final word = _words[index];
-                      return ListTile(
-                        title: Text(word.word),
-                        subtitle: Text(word.meaning),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            setState(() {
-                              _words.removeAt(index);
-                              _updateParent();
-                            });
-                          },
-                        ),
-                      );
-                    },
-                  ),
+    );
+  }
+
+  Widget _buildBookTile(String id, Map<String, dynamic> book) {
+    final name = book['name'] as String? ?? '未命名';
+    final words = book['words'] as List<dynamic>? ?? [];
+    final isCurrent = id == _currentId;
+
+    return ListTile(
+      leading: Icon(
+        isCurrent ? Icons.check_circle : Icons.menu_book,
+        color: isCurrent ? Colors.blue : null,
+      ),
+      title: Text(name),
+      subtitle: Text('${words.length} 个单词'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isCurrent)
+            TextButton(
+              onPressed: () => _switchTo(id),
+              child: const Text('切换'),
+            ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'rename') _renameBook(id, name);
+              if (v == 'delete') _deleteBook(id);
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'rename', child: Text('重命名')),
+              if (id != WordbookStorage.defaultBookId)
+                const PopupMenuItem(value: 'delete', child: Text('删除')),
+            ],
           ),
         ],
       ),

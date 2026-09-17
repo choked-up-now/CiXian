@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
-import '../models/word.dart';
-import '../data/wrong_words_storage.dart';
+import '../data/wordbook_storage.dart';
+import '../data/my_words_storage.dart';
 import '../data/sync_manager.dart';
 import '../data/tts_service.dart';
+import '../models/word.dart';
 
 class DailyLearningScreen extends StatefulWidget {
-  final List<Word> allWords;
-  final List<Word>? poolWords;
+  final Wordbook book;
 
-  const DailyLearningScreen({
-    Key? key,
-    required this.allWords,
-    this.poolWords,
-  }) : super(key: key);
+  const DailyLearningScreen({Key? key, required this.book}) : super(key: key);
 
   @override
   State<DailyLearningScreen> createState() => _DailyLearningScreenState();
@@ -23,7 +19,6 @@ class DailyLearningScreen extends StatefulWidget {
 class _DailyLearningScreenState extends State<DailyLearningScreen> {
   static const int _targetCount = 10;
 
-  late List<Word> _studyWords;
   late List<_Question> _questions;
   int _currentIndex = 0;
   int _score = 0;
@@ -37,50 +32,106 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     _prepareQuestions();
   }
 
-  void _prepareQuestions() {
-    final random = Random();
-    final pool = widget.poolWords ?? widget.allWords;
-
-    final uniqueMeanings = pool.map((e) => e.meaning).toSet().toList();
-    if (uniqueMeanings.length < 4) {
+  Future<void> _prepareQuestions() async {
+    final words = widget.book.words;
+    if (words.length < 4) {
       setState(() {
-        _errorMessage = '词库单词太少，无法生成四选一题目（至少需要4个不同释义）。';
+        _errorMessage = '词书单词太少（至少需要4个）。';
       });
       return;
     }
 
-    final shuffled = List<Word>.from(widget.allWords)..shuffle(random);
-    _studyWords = shuffled.take(min(_targetCount, shuffled.length)).toList();
+    final records = await MyWordsStorage.loadRecords(widget.book.id);
+    final recordMap = {for (final r in records) r.index: r};
 
-    _questions = _studyWords.map((word) {
+    final today = _todayInt();
+    final needReview = <int>[]; // 错题优先复习
+    final unseen = <int>[]; // 没学过的
+    final others = <int>[]; // 学过的、今天还没复习
+
+    for (int i = 0; i < words.length; i++) {
+      final r = recordMap[i];
+      if (r == null) {
+        unseen.add(i);
+      } else if (r.lastReview < today) {
+        if (r.wrongCount > 0) {
+          needReview.add(i);
+        } else {
+          others.add(i);
+        }
+      }
+    }
+
+    // 排序：错题按 lastReview 升序（越早越先），others 同理
+    needReview.sort((a, b) {
+      final ra = recordMap[a]!.lastReview;
+      final rb = recordMap[b]!.lastReview;
+      return ra.compareTo(rb);
+    });
+    others.sort((a, b) {
+      final ra = recordMap[a]!.lastReview;
+      final rb = recordMap[b]!.lastReview;
+      return ra.compareTo(rb);
+    });
+
+    // 组合：错题 → 未学 → 其他
+    final selected = <int>[];
+    selected.addAll(needReview.take(_targetCount));
+    if (selected.length < _targetCount) {
+      selected.addAll(unseen.take(_targetCount - selected.length));
+    }
+    if (selected.length < _targetCount) {
+      selected.addAll(others.take(_targetCount - selected.length));
+    }
+    // 还凑不够就用随机从词书里补
+    if (selected.length < _targetCount) {
+      final random = Random();
+      final allIndexes = List<int>.generate(words.length, (i) => i)
+        ..shuffle(random);
+      for (final i in allIndexes) {
+        if (selected.length >= _targetCount) break;
+        if (!selected.contains(i)) selected.add(i);
+      }
+    }
+
+    // 生成题目
+    final random = Random();
+    final uniqueMeanings = words.map((e) => e.meaning).toSet().toList();
+    _questions = selected.map((idx) {
+      final word = words[idx];
       final wrongMeanings = uniqueMeanings
           .where((m) => m != word.meaning)
           .toList()
         ..shuffle(random);
-      final selectedWrong = wrongMeanings.take(3).toList();
-      final options = [word.meaning, ...selectedWrong]..shuffle(random);
+      final options = [word.meaning, ...wrongMeanings.take(3)]..shuffle(random);
       return _Question(
         word: word,
+        wordIndex: idx,
         options: options,
         correctIndex: options.indexOf(word.meaning),
       );
     }).toList();
+
+    setState(() {});
   }
 
-  void _answer(int index) async {
+  Future<void> _answer(int index) async {
     if (_answered) return;
-    final isCorrect = index == _questions[_currentIndex].correctIndex;
+    final q = _questions[_currentIndex];
+    final isCorrect = index == q.correctIndex;
     setState(() {
       _answered = true;
       _selectedOption = index;
       if (isCorrect) _score++;
     });
 
-    if (!isCorrect) {
-      await WrongWordsStorage.addWrongWord(_questions[_currentIndex].word);
-      // 触发云同步（防抖）
-      SyncManager.scheduleUpload();
+    // 记录
+    if (isCorrect) {
+      await MyWordsStorage.recordCorrect(widget.book.id, q.wordIndex);
+    } else {
+      await MyWordsStorage.recordWrong(widget.book.id, q.wordIndex);
     }
+    SyncManager.scheduleUpload();
   }
 
   void _next() {
@@ -134,6 +185,12 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       );
     }
 
+    if (_questions.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final question = _questions[_currentIndex];
     return Scaffold(
       appBar: AppBar(
@@ -161,7 +218,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.volume_up, size: 32),
-                  tooltip: '朗读',
                   onPressed: () {
                     TtsService().speak(question.word.word);
                   },
@@ -232,15 +288,22 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       ),
     );
   }
+
+  static int _todayInt() {
+    final now = DateTime.now();
+    return now.year * 10000 + now.month * 100 + now.day;
+  }
 }
 
 class _Question {
   final Word word;
+  final int wordIndex;
   final List<String> options;
   final int correctIndex;
 
   _Question({
     required this.word,
+    required this.wordIndex,
     required this.options,
     required this.correctIndex,
   });
