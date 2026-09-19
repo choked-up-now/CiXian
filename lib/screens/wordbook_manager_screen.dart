@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../data/wordbook_storage.dart';
+import '../data/my_words_storage.dart';
+import '../models/word.dart';
 
 class WordbookManagerScreen extends StatefulWidget {
   const WordbookManagerScreen({Key? key}) : super(key: key);
@@ -28,6 +30,13 @@ class _WordbookManagerScreenState extends State<WordbookManagerScreen> {
       _currentId = current;
       _loading = false;
     });
+  }
+
+  Future<List<Word>> _getBookWords(String bookId) async {
+    final book = _books[bookId];
+    if (book == null) return [];
+    final raw = book['words'] as List<dynamic>? ?? [];
+    return raw.map((e) => Word.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<void> _switchTo(String id) async {
@@ -112,7 +121,7 @@ class _WordbookManagerScreenState extends State<WordbookManagerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除词书'),
-        content: const Text('删除后该词书的学习记录也会保留，但词书本身将不可恢复。'),
+        content: const Text('删除后该词书将不可恢复。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -152,6 +161,116 @@ class _WordbookManagerScreenState extends State<WordbookManagerScreen> {
     await _load();
   }
 
+  /// 存储模式对话框
+  Future<void> _showModeDialog(String bookId) async {
+    final words = await _getBookWords(bookId);
+    final currentMode = await MyWordsStorage.getMode(bookId);
+    final sizes = await MyWordsStorage.calcSizes(bookId, words);
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('存储模式'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _modeOption(
+              title: '紧凑模式',
+              size: sizes[1]!,
+              desc: '无序号，全量填充。适合学得较多的词书。',
+              selected: currentMode == 1,
+            ),
+            const SizedBox(height: 12),
+            _modeOption(
+              title: '兼容模式',
+              size: sizes[0]!,
+              desc: '带序号，只存学过的。适合刚起步的词书。',
+              selected: currentMode == 0,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final best = await MyWordsStorage.autoChooseMode(bookId, words);
+              await MyWordsStorage.switchMode(bookId, best, words);
+              if (mounted) {
+                Navigator.pop(context);
+                _load();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('已自动切换到${best == 1 ? '紧凑' : '兼容'}模式')),
+                );
+              }
+            },
+            child: const Text('自动优化'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await MyWordsStorage.switchMode(bookId, 1, words);
+              if (mounted) {
+                Navigator.pop(context);
+                _load();
+              }
+            },
+            child: const Text('用紧凑'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await MyWordsStorage.switchMode(bookId, 0, words);
+              if (mounted) {
+                Navigator.pop(context);
+                _load();
+              }
+            },
+            child: const Text('用兼容'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeOption({
+    required String title,
+    required int size,
+    required String desc,
+    required bool selected,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: selected ? Colors.blue : Colors.grey.shade300,
+          width: selected ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (selected)
+                const Icon(Icons.check_circle, color: Colors.blue, size: 18),
+              if (selected) const SizedBox(width: 6),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Text('$size 字符', style: const TextStyle(color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(desc, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,34 +300,43 @@ class _WordbookManagerScreenState extends State<WordbookManagerScreen> {
     final words = book['words'] as List<dynamic>? ?? [];
     final isCurrent = id == _currentId;
 
-    return ListTile(
-      leading: Icon(
-        isCurrent ? Icons.check_circle : Icons.menu_book,
-        color: isCurrent ? Colors.blue : null,
-      ),
-      title: Text(name),
-      subtitle: Text('${words.length} 个单词'),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!isCurrent)
-            TextButton(
-              onPressed: () => _switchTo(id),
-              child: const Text('切换'),
-            ),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'rename') _renameBook(id, name);
-              if (v == 'delete') _deleteBook(id);
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'rename', child: Text('重命名')),
-              if (id != WordbookStorage.defaultBookId)
-                const PopupMenuItem(value: 'delete', child: Text('删除')),
+    return FutureBuilder<int>(
+      future: MyWordsStorage.getMode(id),
+      builder: (context, snapshot) {
+        final mode = snapshot.data ?? 0;
+        final modeLabel = mode == 1 ? '紧凑模式' : '兼容模式';
+        return ListTile(
+          leading: Icon(
+            isCurrent ? Icons.check_circle : Icons.menu_book,
+            color: isCurrent ? Colors.blue : null,
+          ),
+          title: Text(name),
+          subtitle: Text('${words.length} 个单词 · $modeLabel'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isCurrent)
+                TextButton(
+                  onPressed: () => _switchTo(id),
+                  child: const Text('切换'),
+                ),
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'rename') _renameBook(id, name);
+                  if (v == 'delete') _deleteBook(id);
+                  if (v == 'mode') _showModeDialog(id);
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'mode', child: Text('存储模式')),
+                  const PopupMenuItem(value: 'rename', child: Text('重命名')),
+                  if (id != WordbookStorage.defaultBookId)
+                    const PopupMenuItem(value: 'delete', child: Text('删除')),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
