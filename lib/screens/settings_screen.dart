@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import '../data/wordbook_storage.dart';
@@ -8,6 +7,7 @@ import '../data/version_checker.dart';
 import '../data/tts_service.dart';
 import '../data/apk_downloader.dart';
 import '../data/sync_manager.dart';
+import '../data/user_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -38,7 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清空当前词书记录'),
-        content: const Text('确定要清空当前词书的全部学习记录（错题/已掌握/收藏）吗？此操作不可撤销。'),
+        content: const Text('确定要清空当前词书的全部学习记录吗？此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -63,7 +63,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 云同步开关
+  // 每日学习量设置
+  Future<void> _showDailyCountDialog() async {
+    final newCount = await UserSettings.dailyNew();
+    final reviewCount = await UserSettings.dailyReview();
+
+    final newCtrl = TextEditingController(text: newCount.toString());
+    final reviewCtrl = TextEditingController(text: reviewCount.toString());
+
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('每日学习量'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: newCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '每日新词数量',
+                hintText: '默认 10',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reviewCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '每日复习数量',
+                hintText: '默认 10',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+    final n1 = int.tryParse(newCtrl.text.trim()) ?? 10;
+    final n2 = int.tryParse(reviewCtrl.text.trim()) ?? 10;
+    await UserSettings.setDailyNew(n1.clamp(1, 100));
+    await UserSettings.setDailyReview(n2.clamp(1, 100));
+    if (mounted) setState(() {});
+  }
+
   Future<void> _toggleCloudSync() async {
     final enabled = await SyncManager.isEnabled();
 
@@ -189,7 +242,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // 检查更新
   void _checkUpdate() async {
     final acceptPre = await VersionChecker.isAcceptPreRelease();
     if (!mounted) return;
@@ -420,6 +472,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('检查更新'),
             subtitle: const Text('查看是否有新版本'),
             onTap: _checkUpdate,
+          ),
+          FutureBuilder<List<int>>(
+            future: Future.wait(
+                [UserSettings.dailyNew(), UserSettings.dailyReview()]),
+            builder: (context, snapshot) {
+              final n = snapshot.data?[0] ?? 10;
+              final r = snapshot.data?[1] ?? 10;
+              return ListTile(
+                leading: const Icon(Icons.tune),
+                title: const Text('每日学习量'),
+                subtitle: Text('新词 $n 个 · 复习 $r 个'),
+                onTap: _showDailyCountDialog,
+              );
+            },
           ),
           FutureBuilder<bool>(
             future: SyncManager.isEnabled(),

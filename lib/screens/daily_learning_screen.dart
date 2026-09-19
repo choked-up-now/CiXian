@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
+import '../data/ebbinghaus.dart';
 import '../data/wordbook_storage.dart';
 import '../data/my_words_storage.dart';
 import '../data/sync_manager.dart';
 import '../data/tts_service.dart';
+import '../data/user_settings.dart';
 import '../models/word.dart';
 
 class DailyLearningScreen extends StatefulWidget {
@@ -17,8 +19,6 @@ class DailyLearningScreen extends StatefulWidget {
 }
 
 class _DailyLearningScreenState extends State<DailyLearningScreen> {
-  static const int _targetCount = 10;
-
   late List<_Question> _questions;
   int _currentIndex = 0;
   int _score = 0;
@@ -43,61 +43,57 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
 
     final records = await MyWordsStorage.loadRecords(widget.book.id);
     final recordMap = {for (final r in records) r.index: r};
-
     final today = _todayInt();
-    final needReview = <int>[]; // 错题优先复习
-    final unseen = <int>[]; // 没学过的
-    final others = <int>[]; // 学过的、今天还没复习
 
+    final newCount = await UserSettings.dailyNew();
+    final reviewCount = await UserSettings.dailyReview();
+
+    // ============ 1. 抽新词（lastReview == 0）============
+    final newIndexes = <int>[];
     for (int i = 0; i < words.length; i++) {
       final r = recordMap[i];
-      if (r == null) {
-        unseen.add(i);
-      } else if (r.lastReview < today) {
-        if (r.wrongCount > 0) {
-          needReview.add(i);
-        } else {
-          others.add(i);
-        }
+      if (r == null || r.lastReview == 0) {
+        newIndexes.add(i);
+        if (newIndexes.length >= newCount) break;
       }
     }
 
-    // 排序：错题按 lastReview 升序（越早越先），others 同理
-    needReview.sort((a, b) {
-      final ra = recordMap[a]!.lastReview;
-      final rb = recordMap[b]!.lastReview;
-      return ra.compareTo(rb);
-    });
-    others.sort((a, b) {
-      final ra = recordMap[a]!.lastReview;
-      final rb = recordMap[b]!.lastReview;
-      return ra.compareTo(rb);
-    });
+    // ============ 2. 抽旧词（lastReview > 0 且 < today）============
+    final candidates = <int>[];
+    final weights = <double>[];
+    for (int i = 0; i < words.length; i++) {
+      final r = recordMap[i];
+      if (r == null) continue;
+      if (r.lastReview == 0) continue;
+      if (r.lastReview >= today) continue; // 今天已经复习过
+      final days = _daysBetween(r.lastReview, today);
+      final y = Ebbinghaus.retention(days);
+      final m = r.reviewCount;
+      final n = r.wrongCount;
+      final w = m == 0 ? 1 + 0.5 * (1 - y) : 1 + 0.5 * (1 - y) + n / m;
+      candidates.add(i);
+      weights.add(w);
+    }
 
-    // 组合：错题 → 未学 → 其他
-    final selected = <int>[];
-    selected.addAll(needReview.take(_targetCount));
-    if (selected.length < _targetCount) {
-      selected.addAll(unseen.take(_targetCount - selected.length));
-    }
-    if (selected.length < _targetCount) {
-      selected.addAll(others.take(_targetCount - selected.length));
-    }
-    // 还凑不够就用随机从词书里补
-    if (selected.length < _targetCount) {
+    final reviewIndexes = _weightedSample(candidates, weights, reviewCount);
+
+    // ============ 3. 合并，不够就补 ============
+    final selected = <int>{};
+    selected.addAll(newIndexes);
+    selected.addAll(reviewIndexes);
+    if (selected.length < newCount + reviewCount) {
       final random = Random();
-      final allIndexes = List<int>.generate(words.length, (i) => i)
-        ..shuffle(random);
-      for (final i in allIndexes) {
-        if (selected.length >= _targetCount) break;
-        if (!selected.contains(i)) selected.add(i);
+      final all = List<int>.generate(words.length, (i) => i)..shuffle(random);
+      for (final i in all) {
+        if (selected.length >= newCount + reviewCount) break;
+        selected.add(i);
       }
     }
 
-    // 生成题目
+    // ============ 4. 生成题目 ============
     final random = Random();
     final uniqueMeanings = words.map((e) => e.meaning).toSet().toList();
-    _questions = selected.map((idx) {
+    _questions = selected.toList().map((idx) {
       final word = words[idx];
       final wrongMeanings = uniqueMeanings
           .where((m) => m != word.meaning)
@@ -112,7 +108,41 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       );
     }).toList();
 
+    if (_questions.isEmpty) {
+      setState(() {
+        _errorMessage = '暂时没有可学习的单词。';
+      });
+      return;
+    }
+
     setState(() {});
+  }
+
+  /// 加权随机抽样（不放回）
+  List<int> _weightedSample(
+      List<int> candidates, List<double> weights, int count) {
+    final result = <int>[];
+    final pool = List<int>.from(candidates);
+    final w = List<double>.from(weights);
+    final random = Random();
+
+    for (int k = 0; k < count && pool.isNotEmpty; k++) {
+      final total = w.fold<double>(0, (a, b) => a + b);
+      if (total <= 0) break;
+      double r = random.nextDouble() * total;
+      int pick = pool.length - 1;
+      for (int i = 0; i < pool.length; i++) {
+        r -= w[i];
+        if (r <= 0) {
+          pick = i;
+          break;
+        }
+      }
+      result.add(pool[pick]);
+      pool.removeAt(pick);
+      w.removeAt(pick);
+    }
+    return result;
   }
 
   Future<void> _answer(int index) async {
@@ -125,7 +155,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       if (isCorrect) _score++;
     });
 
-    // 记录
     if (isCorrect) {
       await MyWordsStorage.recordCorrect(widget.book.id, q.wordIndex);
     } else {
@@ -292,6 +321,21 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
   static int _todayInt() {
     final now = DateTime.now();
     return now.year * 10000 + now.month * 100 + now.day;
+  }
+
+  /// 计算两个 YYYYMMDD 之间的天数差
+  static int _daysBetween(int from, int to) {
+    final d1 = DateTime(
+      from ~/ 10000,
+      (from ~/ 100) % 100,
+      from % 100,
+    );
+    final d2 = DateTime(
+      to ~/ 10000,
+      (to ~/ 100) % 100,
+      to % 100,
+    );
+    return d2.difference(d1).inDays;
   }
 }
 
