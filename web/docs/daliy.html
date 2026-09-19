@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>每日学习 · 词冼</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>每日学习</h1>
+
+  <div class="nav">
+    <a href="index.html">首页</a>
+    <a href="install.html">安装</a>
+    <a href="daily.html" class="active">每日学习</a>
+    <a href="my-words.html">我的单词</a>
+    <a href="sync.html">云同步</a>
+    <a href="wordbook.html">词书格式</a>
+    <a href="faq.html">常见问题</a>
+  </div>
+
+  <div class="card">
+    <h2>怎么用</h2>
+    <p>在首页点击右下角的"开始今日学习"，进入四选一词义辨析。</p>
+    <p>系统会从你的词书里抽出：</p>
+    <ul>
+      <li><b>x 个新词</b>（你还没学过的）</li>
+      <li><b>x 个旧词</b>（按记忆曲线加权抽取）</li>
+    </ul>
+    <p>x 的默认值是 10，可在 <b>设置 → 每日学习量</b> 里调整。</p>
+  </div>
+
+  <div class="card">
+    <h2>智能出题</h2>
+    <p>词冼的出题不是均匀随机，而是按掌握程度加权：</p>
+    <ul>
+      <li><b>错得越多</b>的词，越容易被抽到</li>
+      <li><b>忘得越快</b>的词（按艾宾浩斯遗忘曲线判断），优先复习</li>
+      <li>复习节点：1 天、2 天、6 天、31 天</li>
+    </ul>
+    <div class="tip">这样保证你把时间花在真正需要的词上。</div>
+  </div>
+
+  <div class="card">
+    <h2>答案反馈</h2>
+    <ul>
+      <li>点击选项后立即显示对错</li>
+      <li>绿色对勾表示正确选项</li>
+      <li>红色叉号表示你选错的选项</li>
+      <li>点击"下一题"继续</li>
+      <li>全部答完后显示成绩</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>自动记录</h2>
+    <ul>
+      <li>答错的词自动进入 <b>错题本</b></li>
+      <li>答对的词记录复习时间与次数</li>
+      <li>当天已复习过的词不会重复出现</li>
+    </ul>
+  </div>
+
+  <a class="back" href="index.html">返回首页</a>
+</body>
+</html>

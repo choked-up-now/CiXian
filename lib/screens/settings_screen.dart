@@ -112,8 +112,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (ok != true) return;
     final n1 = int.tryParse(newCtrl.text.trim()) ?? 10;
     final n2 = int.tryParse(reviewCtrl.text.trim()) ?? 10;
-    await UserSettings.setDailyNew(n1.clamp(1, 100));
-    await UserSettings.setDailyReview(n2.clamp(1, 100));
+    await UserSettings.setDailyNew(n1 < 1 ? 1 : n1);
+    await UserSettings.setDailyReview(n2 < 1 ? 1 : n2);
     if (mounted) setState(() {});
   }
 
@@ -167,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('云同步已开启 🎉'),
+              title: const Text('云同步已开启'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,7 +313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('发现新版本 🎉'),
+          title: const Text('发现新版本'),
           content: Text(
             '当前版本：${result.currentVersion}\n'
             '最新版本：${result.latestVersion}',
@@ -461,12 +461,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _openHelp() async {
+    final uri = Uri.parse('https://cixian.pages.dev/docs/');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('帮助中心'),
+            subtitle: const Text('使用指南、常见问题'),
+            onTap: _openHelp,
+          ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.system_update),
             title: const Text('检查更新'),
@@ -518,6 +532,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: _clearData,
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.favorite),
+            title: const Text('支持作者'),
+            subtitle: const Text('爱发电 · 请作者喝杯奶茶'),
+            onTap: () async {
+              final uri = Uri.parse('https://afdian.com/a/choked-up-now');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+          ),
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

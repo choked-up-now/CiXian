@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>词书格式 · 词冼</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>词书格式</h1>
+
+  <div class="nav">
+    <a href="index.html">首页</a>
+    <a href="install.html">安装</a>
+    <a href="daily.html">每日学习</a>
+    <a href="my-words.html">我的单词</a>
+    <a href="sync.html">云同步</a>
+    <a href="wordbook.html" class="active">词书格式</a>
+    <a href="faq.html">常见问题</a>
+  </div>
+
+  <div class="card">
+    <h2>JSON 格式</h2>
+    <p>词冼使用 JSON 数组存储词书，每个元素是一个单词对象：</p>
+<pre><code>[
+  {
+    "word": "textbook",
+    "phonetic": "/ˈtekstbʊk/",
+    "pos": "n.",
+    "meaning": "教科书；课本",
+    "example": "This is an English textbook."
+  }
+]</code></pre>
+  </div>
+
+  <div class="card">
+    <h2>字段说明</h2>
+    <table>
+      <tr>
+        <th>字段</th>
+        <th>必填</th>
+        <th>说明</th>
+      </tr>
+      <tr>
+        <td><code>word</code></td>
+        <td>是</td>
+        <td>单词或词组</td>
+      </tr>
+      <tr>
+        <td><code>meaning</code></td>
+        <td>是</td>
+        <td>中文释义</td>
+      </tr>
+      <tr>
+        <td><code>phonetic</code></td>
+        <td>否</td>
+        <td>音标，用斜杠包裹，如 <code>/ˈtekstbʊk/</code></td>
+      </tr>
+      <tr>
+        <td><code>pos</code></td>
+        <td>否</td>
+        <td>词性，如 <code>n.</code> <code>v.</code> <code>adj.</code></td>
+      </tr>
+      <tr>
+        <td><code>example</code></td>
+        <td>否</td>
+        <td>例句</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>导入词书</h2>
+    <ol>
+      <li>进入 <b>词书管理</b>（首页右上角书本图标）</li>
+      <li>点击 <b>添加新词书</b></li>
+      <li>填入词书名称</li>
+      <li>把 JSON 内容粘贴到输入框</li>
+      <li>点击"添加"</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>注意事项</h2>
+    <ul>
+      <li>JSON 必须是合法的数组格式</li>
+      <li><code>word</code> 和 <code>meaning</code> 不能为空</li>
+      <li>词书至少要有 4 个不同释义的单词，否则无法生成四选一题</li>
+      <li>建议按教材顺序排列，学习体验更自然</li>
+    </ul>
+  </div>
+
+  <a class="back" href="index.html">返回首页</a>
+</body>
+</html>
