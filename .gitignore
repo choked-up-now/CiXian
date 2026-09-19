@@ -41,3 +41,10 @@ app.*.map.json
 /android/app/release
 # Widget Preview related
 .widget_preview/
+
+# Cloudflare Wrangler
+.wrangler/
+
+# Node.js（如果以后 functions 里加依赖）
+node_modules/
+package-lock.json
