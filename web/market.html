@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>词书市场 · 词冼</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                   "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+      color: #333;
+      background: #fafafa;
+      padding: 16px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #1976d2;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    .login-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .login-card label {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #555;
+    }
+    .login-row {
+      display: flex;
+      gap: 8px;
+    }
+    .login-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+    button {
+      padding: 10px 16px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #1565c0; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: #eee;
+      color: #555;
+    }
+    button.secondary:hover { background: #ddd; }
+    .status {
+      font-size: 13px;
+      margin-top: 8px;
+      color: #666;
+    }
+    .status.ok { color: #2e7d32; }
+    .status.err { color: #c62828; }
+    .book-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .book-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .book-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .book-meta {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .book-desc {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    .book-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .loading {
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      padding: 32px 0;
+    }
+    .empty {
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      padding: 32px 0;
+    }
+    .back {
+      display: inline-block;
+      margin-top: 24px;
+      color: #666;
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .back:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>词书市场</h1>
+  <p class="subtitle">选择要同步到你账号的词书，客户端会自动下载。</p>
+
+  <div class="login-card">
+    <label>输入你的同步码</label>
+    <div class="login-row">
+      <input id="syncCode" type="text" placeholder="例如 ABC-DEF-123" />
+      <button id="loginBtn">登录</button>
+    </div>
+    <div id="loginStatus" class="status"></div>
+  </div>
+
+  <div id="booksContainer">
+    <div class="loading">正在加载词书列表...</div>
+  </div>
+
+  <a class="back" href="/">返回词冼</a>
+
+  <script>
+    const API_BASE = '';
+    let syncCode = localStorage.getItem('sync_code') || '';
+    let selectedBooks = new Set();
+
+    // ============ 工具 ============
+    function setStatus(el, msg, type) {
+      el.textContent = msg;
+      el.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(API_BASE + path, options);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || ('HTTP ' + res.status));
+      }
+      return res.json();
+    }
+
+    // ============ 登录 ============
+    async function login() {
+      const input = document.getElementById('syncCode');
+      const code = (input.value || '').trim().toUpperCase();
+      const statusEl = document.getElementById('loginStatus');
+
+      if (!code) {
+        setStatus(statusEl, '请输入同步码', 'err');
+        return;
+      }
+
+      setStatus(statusEl, '验证中...');
+      try {
+        const data = await api('/user/books?sync_code=' + encodeURIComponent(code));
+        syncCode = code;
+        localStorage.setItem('sync_code', code);
+        selectedBooks = new Set(data.books.map(b => b.book_id));
+        setStatus(statusEl, '登录成功，共 ' + selectedBooks.size + ' 本词书', 'ok');
+        renderBooks();
+      } catch (e) {
+        setStatus(statusEl, '登录失败：' + e.message, 'err');
+      }
+    }
+
+    // ============ 加载词书列表 ============
+    async function loadBooks() {
+      const container = document.getElementById('booksContainer');
+      try {
+        const data = await api('/wordbooks');
+        window._allBooks = data.books || [];
+        renderBooks();
+      } catch (e) {
+        container.innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
+      }
+    }
+
+    // ============ 渲染 ============
+    function renderBooks() {
+      const container = document.getElementById('booksContainer');
+      const books = window._allBooks || [];
+
+      if (books.length === 0) {
+        container.innerHTML = '<div class="empty">暂无词书</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      for (const book of books) {
+        const isSelected = selectedBooks.has(book.id);
+        const card = document.createElement('div');
+        card.className = 'book-card';
+        card.innerHTML = `
+          <div class="book-header">
+            <div>
+              <div class="book-title">${escapeHtml(book.name)}</div>
+              <div class="book-meta">${book.word_count} 词 · ${escapeHtml(book.author || '')}</div>
+            </div>
+          </div>
+          <div class="book-desc">${escapeHtml(book.description || '')}</div>
+          <div class="book-actions">
+            <button class="toggle-btn" data-id="${book.id}">
+              ${isSelected ? '从我的词书移除' : '添加到我的词书'}
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      }
+
+      container.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', onToggle);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    // ============ 添加 / 移除 ============
+    async function onToggle(e) {
+      const btn = e.target;
+      const bookId = btn.dataset.id;
+
+      if (!syncCode) {
+        alert('请先输入同步码登录');
+        return;
+      }
+
+      const isSelected = selectedBooks.has(bookId);
+      btn.disabled = true;
+      btn.textContent = isSelected ? '移除中...' : '添加中...';
+
+      try {
+        if (isSelected) {
+          await api('/user/books/' + bookId + '?sync_code=' + encodeURIComponent(syncCode), {
+            method: 'DELETE',
+          });
+          selectedBooks.delete(bookId);
+        } else {
+          await api('/user/books', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sync_code: syncCode, book_id: bookId }),
+          });
+          selectedBooks.add(bookId);
+        }
+        const statusEl = document.getElementById('loginStatus');
+        setStatus(statusEl, '已保存，共 ' + selectedBooks.size + ' 本词书', 'ok');
+        renderBooks();
+      } catch (e) {
+        btn.disabled = false;
+        alert('操作失败：' + e.message);
+        renderBooks();
+      }
+    }
+
+    // ============ 初始化 ============
+    function init() {
+      if (syncCode) {
+        document.getElementById('syncCode').value = syncCode;
+        login();
+      }
+      loadBooks();
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', login);
+    document.getElementById('syncCode').addEventListener('keypress', e => {
+      if (e.key === 'Enter') login();
+    });
+
+    init();
+  </script>
+</body>
+</html>
