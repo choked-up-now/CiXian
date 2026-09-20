@@ -26,10 +26,20 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
   int? _selectedOption;
   String? _errorMessage;
 
+  final TextEditingController _spellCtrl = TextEditingController();
+  bool _spellCorrect = false;
+  bool _spellSubmitted = false;
+
   @override
   void initState() {
     super.initState();
     _prepareQuestions();
+  }
+
+  @override
+  void dispose() {
+    _spellCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _prepareQuestions() async {
@@ -48,7 +58,6 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     final newCount = await UserSettings.dailyNew();
     final reviewCount = await UserSettings.dailyReview();
 
-    // ============ 1. 抽新词（lastReview == 0）============
     final newIndexes = <int>[];
     for (int i = 0; i < words.length; i++) {
       final r = recordMap[i];
@@ -58,14 +67,13 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       }
     }
 
-    // ============ 2. 抽旧词（lastReview > 0 且 < today）============
     final candidates = <int>[];
     final weights = <double>[];
     for (int i = 0; i < words.length; i++) {
       final r = recordMap[i];
       if (r == null) continue;
       if (r.lastReview == 0) continue;
-      if (r.lastReview >= today) continue; // 今天已经复习过
+      if (r.lastReview >= today) continue;
       final days = _daysBetween(r.lastReview, today);
       final y = Ebbinghaus.retention(days);
       final m = r.reviewCount;
@@ -74,10 +82,8 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       candidates.add(i);
       weights.add(w);
     }
-
     final reviewIndexes = _weightedSample(candidates, weights, reviewCount);
 
-    // ============ 3. 合并，不够就补 ============
     final selected = <int>{};
     selected.addAll(newIndexes);
     selected.addAll(reviewIndexes);
@@ -90,21 +96,52 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       }
     }
 
-    // ============ 4. 生成题目 ============
+    final enabledTypes = (await UserSettings.enabledTypes()).toList();
     final random = Random();
     final uniqueMeanings = words.map((e) => e.meaning).toSet().toList();
-    _questions = selected.toList().map((idx) {
+    final uniqueWords = words.map((e) => e.word).toSet().toList();
+
+    _questions = selected.map((idx) {
       final word = words[idx];
-      final wrongMeanings = uniqueMeanings
-          .where((m) => m != word.meaning)
-          .toList()
-        ..shuffle(random);
-      final options = [word.meaning, ...wrongMeanings.take(3)]..shuffle(random);
+      final type = enabledTypes[random.nextInt(enabledTypes.length)];
+
+      if (type == QuestionType.zhToSpell) {
+        return _Question(
+          word: word,
+          wordIndex: idx,
+          type: type,
+          options: const [],
+          correctIndex: -1,
+        );
+      }
+
+      String correct;
+      List<String> pool;
+
+      switch (type) {
+        case QuestionType.enToZh:
+        case QuestionType.listenToZh:
+          correct = word.meaning;
+          pool = uniqueMeanings.where((m) => m != correct).toList();
+          break;
+        case QuestionType.zhToEn:
+        case QuestionType.listenToEn:
+          correct = word.word;
+          pool = uniqueWords.where((w) => w != correct).toList();
+          break;
+        default:
+          correct = word.meaning;
+          pool = uniqueMeanings.where((m) => m != correct).toList();
+      }
+
+      pool.shuffle(random);
+      final options = [correct, ...pool.take(3)]..shuffle(random);
       return _Question(
         word: word,
         wordIndex: idx,
+        type: type,
         options: options,
-        correctIndex: options.indexOf(word.meaning),
+        correctIndex: options.indexOf(correct),
       );
     }).toList();
 
@@ -116,9 +153,17 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     }
 
     setState(() {});
+    _autoPlayIfListen();
   }
 
-  /// 加权随机抽样（不放回）
+  void _autoPlayIfListen() {
+    final q = _questions[_currentIndex];
+    if (q.type == QuestionType.listenToZh ||
+        q.type == QuestionType.listenToEn) {
+      TtsService().speak(q.word.word);
+    }
+  }
+
   List<int> _weightedSample(
       List<int> candidates, List<double> weights, int count) {
     final result = <int>[];
@@ -163,14 +208,41 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     SyncManager.scheduleUpload();
   }
 
+  Future<void> _submitSpell() async {
+    if (_answered) return;
+    final q = _questions[_currentIndex];
+    final input = _normalize(_spellCtrl.text);
+    final correct = _normalize(q.word.word);
+    final isCorrect = input == correct;
+
+    setState(() {
+      _answered = true;
+      _spellSubmitted = true;
+      _spellCorrect = isCorrect;
+      if (isCorrect) _score++;
+    });
+
+    if (isCorrect) {
+      await MyWordsStorage.recordCorrect(widget.book.id, q.wordIndex);
+    } else {
+      await MyWordsStorage.recordWrong(widget.book.id, q.wordIndex);
+    }
+    SyncManager.scheduleUpload();
+  }
+
+  String _normalize(String s) => s.trim().toLowerCase();
+
   void _next() {
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
         _answered = false;
         _selectedOption = null;
+        _spellSubmitted = false;
+        _spellCorrect = false;
+        _spellCtrl.clear();
       });
-      TtsService().speak(_questions[_currentIndex].word.word);
+      _autoPlayIfListen();
     } else {
       _showResult();
     }
@@ -181,7 +253,7 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('学习完成！'),
+        title: const Text('学习完成'),
         content: Text('答对 $_score / ${_questions.length} 题'),
         actions: [
           TextButton(
@@ -220,7 +292,7 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
       );
     }
 
-    final question = _questions[_currentIndex];
+    final q = _questions[_currentIndex];
     return Scaffold(
       appBar: AppBar(
         title: Text('每日学习 (${_currentIndex + 1}/${_questions.length})'),
@@ -235,71 +307,22 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
               minHeight: 8,
               backgroundColor: Colors.grey[300],
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  question.word.word,
-                  style: const TextStyle(
-                      fontSize: 36, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.volume_up, size: 32),
-                  onPressed: () {
-                    TtsService().speak(question.word.word);
-                  },
-                ),
-              ],
-            ),
             const SizedBox(height: 8),
             Text(
-              question.word.phonetic,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              q.type.label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            _buildPrompt(q),
             const SizedBox(height: 32),
-            ...List.generate(question.options.length, (index) {
-              final option = question.options[index];
-              final isCorrect = index == question.correctIndex;
-              final isSelected = _selectedOption == index;
-
-              Color buttonColor;
-              IconData? icon;
-              if (!_answered) {
-                buttonColor = Colors.white;
-              } else if (isCorrect) {
-                buttonColor = Colors.green.withValues(alpha: 0.3);
-                icon = Icons.check;
-              } else if (isSelected && !isCorrect) {
-                buttonColor = Colors.red.withValues(alpha: 0.3);
-                icon = Icons.close;
-              } else {
-                buttonColor = Colors.white;
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: ElevatedButton(
-                  onPressed: () => _answer(index),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child:
-                            Text(option, style: const TextStyle(fontSize: 18)),
-                      ),
-                      if (icon != null) Icon(icon),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const Spacer(),
+            Expanded(
+              child: SingleChildScrollView(
+                child: q.type == QuestionType.zhToSpell
+                    ? _buildSpellInput(q)
+                    : _buildOptions(q),
+              ),
+            ),
             if (_answered)
               ElevatedButton(
                 onPressed: _next,
@@ -318,23 +341,150 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     );
   }
 
+  Widget _buildPrompt(_Question q) {
+    switch (q.type) {
+      case QuestionType.enToZh:
+        return Text(
+          q.word.word,
+          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        );
+      case QuestionType.zhToEn:
+      case QuestionType.zhToSpell:
+        return Text(
+          q.word.meaning,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        );
+      case QuestionType.listenToZh:
+      case QuestionType.listenToEn:
+        return Column(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.volume_up, size: 72, color: Colors.blue),
+              onPressed: () => TtsService().speak(q.word.word),
+            ),
+            const Text('点击喇叭重听',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        );
+    }
+  }
+
+  Widget _buildOptions(_Question q) {
+    return Column(
+      children: List.generate(q.options.length, (index) {
+        final option = q.options[index];
+        final isCorrect = index == q.correctIndex;
+        final isSelected = _selectedOption == index;
+
+        Color buttonColor;
+        IconData? icon;
+        if (!_answered) {
+          buttonColor = Colors.white;
+        } else if (isCorrect) {
+          buttonColor = Colors.green.withValues(alpha: 0.3);
+          icon = Icons.check;
+        } else if (isSelected && !isCorrect) {
+          buttonColor = Colors.red.withValues(alpha: 0.3);
+          icon = Icons.close;
+        } else {
+          buttonColor = Colors.white;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ElevatedButton(
+            onPressed: () => _answer(index),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: buttonColor,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(option, style: const TextStyle(fontSize: 18)),
+                ),
+                if (icon != null) Icon(icon),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSpellInput(_Question q) {
+    return Column(
+      children: [
+        TextField(
+          controller: _spellCtrl,
+          enabled: !_spellSubmitted,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _submitSpell(),
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: '输入对应的英文单词',
+            filled: true,
+            fillColor: _spellSubmitted
+                ? (_spellCorrect
+                    ? Colors.green.withValues(alpha: 0.15)
+                    : Colors.red.withValues(alpha: 0.15))
+                : Colors.white,
+            suffixIcon: _spellSubmitted
+                ? Icon(
+                    _spellCorrect ? Icons.check : Icons.close,
+                    color: _spellCorrect ? Colors.green : Colors.red,
+                  )
+                : null,
+          ),
+          style: const TextStyle(fontSize: 20),
+        ),
+        const SizedBox(height: 16),
+        if (!_spellSubmitted)
+          ElevatedButton(
+            onPressed: _submitSpell,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: Colors.blue,
+            ),
+            child: const Text('提交', style: TextStyle(color: Colors.white)),
+          ),
+        if (_spellSubmitted && !_spellCorrect)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                const Text('正确答案：', style: TextStyle(fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(
+                  q.word.word,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   static int _todayInt() {
     final now = DateTime.now();
     return now.year * 10000 + now.month * 100 + now.day;
   }
 
-  /// 计算两个 YYYYMMDD 之间的天数差
   static int _daysBetween(int from, int to) {
-    final d1 = DateTime(
-      from ~/ 10000,
-      (from ~/ 100) % 100,
-      from % 100,
-    );
-    final d2 = DateTime(
-      to ~/ 10000,
-      (to ~/ 100) % 100,
-      to % 100,
-    );
+    final d1 = DateTime(from ~/ 10000, (from ~/ 100) % 100, from % 100);
+    final d2 = DateTime(to ~/ 10000, (to ~/ 100) % 100, to % 100);
     return d2.difference(d1).inDays;
   }
 }
@@ -342,12 +492,14 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
 class _Question {
   final Word word;
   final int wordIndex;
+  final QuestionType type;
   final List<String> options;
   final int correctIndex;
 
   _Question({
     required this.word,
     required this.wordIndex,
+    required this.type,
     required this.options,
     required this.correctIndex,
   });

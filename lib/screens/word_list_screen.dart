@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/wordbook_storage.dart';
 import '../data/tts_service.dart';
 import '../data/my_words_storage.dart';
@@ -23,7 +24,6 @@ class WordListScreen extends StatefulWidget {
 }
 
 class _WordListScreenState extends State<WordListScreen> {
-  // 收藏状态缓存：word -> isFavorite
   Map<String, bool> _favorites = {};
 
   @override
@@ -47,8 +47,20 @@ class _WordListScreenState extends State<WordListScreen> {
     final word = widget.book.words[index];
     final newValue = await MyWordsStorage.toggleFavorite(widget.book.id, index);
     setState(() => _favorites[word.word] = newValue);
-    // 触发云同步
     SyncManager.scheduleUpload();
+  }
+
+  Future<void> _openMarket() async {
+    final uri = Uri.parse('https://cixian.pages.dev/market.html');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开词书市场：$e')),
+        );
+      }
+    }
   }
 
   @override
@@ -57,6 +69,11 @@ class _WordListScreenState extends State<WordListScreen> {
       appBar: AppBar(
         title: Text('词冼 · ${widget.book.name}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront),
+            tooltip: '词书市场',
+            onPressed: _openMarket,
+          ),
           IconButton(
             icon: const Icon(Icons.star),
             tooltip: '我的单词',

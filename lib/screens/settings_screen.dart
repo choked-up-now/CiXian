@@ -63,7 +63,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // 每日学习量设置
   Future<void> _showDailyCountDialog() async {
     final newCount = await UserSettings.dailyNew();
     final reviewCount = await UserSettings.dailyReview();
@@ -115,6 +114,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await UserSettings.setDailyNew(n1 < 1 ? 1 : n1);
     await UserSettings.setDailyReview(n2 < 1 ? 1 : n2);
     if (mounted) setState(() {});
+  }
+
+  Future<void> _showQuestionTypeDialog() async {
+    final current = await UserSettings.enabledTypes();
+    final temp = Set<QuestionType>.from(current);
+
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('题型设置'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: QuestionType.values.map((t) {
+                return CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.label),
+                  subtitle: Text(
+                    t.description,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: temp.contains(t),
+                  onChanged: (v) {
+                    if (v == true) {
+                      temp.add(t);
+                    } else {
+                      if (temp.length > 1) {
+                        temp.remove(t);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('至少保留一种题型')),
+                        );
+                      }
+                    }
+                    setDialogState(() {});
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok == true) {
+      await UserSettings.setEnabledTypes(temp);
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _toggleCloudSync() async {
@@ -461,10 +520,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _openHelp() async {
-    final uri = Uri.parse('https://cixian.pages.dev/docs/');
-    if (await canLaunchUrl(uri)) {
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开：$e')),
+        );
+      }
     }
   }
 
@@ -478,7 +543,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.help_outline),
             title: const Text('帮助中心'),
             subtitle: const Text('使用指南、常见问题'),
-            onTap: _openHelp,
+            onTap: () => _openUrl('https://cixian.pages.dev/docs/'),
           ),
           const Divider(),
           ListTile(
@@ -498,6 +563,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('每日学习量'),
                 subtitle: Text('新词 $n 个 · 复习 $r 个'),
                 onTap: _showDailyCountDialog,
+              );
+            },
+          ),
+          FutureBuilder<Set<QuestionType>>(
+            future: UserSettings.enabledTypes(),
+            builder: (context, snapshot) {
+              final types = snapshot.data ?? QuestionType.values.toSet();
+              final labels = types.map((t) => t.label).join('、');
+              return ListTile(
+                leading: const Icon(Icons.quiz),
+                title: const Text('题型设置'),
+                subtitle: Text('已启用：$labels'),
+                onTap: _showQuestionTypeDialog,
               );
             },
           ),
@@ -536,12 +614,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.favorite),
             title: const Text('支持作者'),
             subtitle: const Text('爱发电 · 请作者喝杯奶茶'),
-            onTap: () async {
-              final uri = Uri.parse('https://afdian.com/a/choked-up-now');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
+            onTap: () => _openUrl('https://afdian.com/a/choked-up-now'),
           ),
           const Padding(
             padding: EdgeInsets.all(16.0),
