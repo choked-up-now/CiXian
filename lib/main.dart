@@ -1,3 +1,6 @@
+// Copyright 2026 choked-up-now
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 import 'data/wordbook_storage.dart';
 import 'data/sync_manager.dart';

@@ -1,3 +1,6 @@
+// Copyright 2026 choked-up-now
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
@@ -544,6 +547,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('帮助中心'),
             subtitle: const Text('使用指南、常见问题'),
             onTap: () => _openUrl('https://cixian.pages.dev/docs/'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('反馈与建议'),
+            subtitle: const Text('提交 Bug 或新功能建议'),
+            onTap: () =>
+                _openUrl('https://atomgit.com/choked-up-now/CiXian/issues'),
           ),
           const Divider(),
           ListTile(

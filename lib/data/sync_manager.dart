@@ -1,3 +1,6 @@
+// Copyright 2026 choked-up-now
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'my_words_storage.dart';

@@ -1,3 +1,6 @@
+// Copyright 2026 choked-up-now
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_tts/flutter_tts.dart';
