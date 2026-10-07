@@ -1,0 +1,41 @@
+name: Deploy Flutter Web to Netlify
+
+on:
+  push:
+    branches: [ main ] # 只有推送到 main 分支时才触发
+  workflow_dispatch: # 允许在 GitHub 页面手动点击运行
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true # 开启缓存，加速后续构建
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release
+        env:
+          # 加上国内镜像加速，防止下载超时
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: './build/web'
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
