@@ -1,7 +1,7 @@
 [build]
   publish = "build/web"
 
-# SPA 路由重定向，Flutter Web 必须要有
+# Flutter Web 的 SPA 路由重定向
 [[redirects]]
   from = "/*"
   to = "/index.html"
