@@ -2,7 +2,7 @@
 
 > 一个极简的背单词软件，内置多版本教材词书，支持云同步与自定义词书。
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MulanPSL--2.0-orange.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.2-02569B?logo=flutter)](https://flutter.dev)
 
 ---
@@ -19,7 +19,7 @@
 
 - **多版本教材词书**：外研版、译林版、人教版、北师大版（九年级上册）
 - **五种题型**：英选中、中选英、看中译英、听音选意、听音选词，可自由开关
-- **每日学习**：新词 + 旧词混合，答完即出成绩
+- **每日学习**：新词 + 旧词混合，答完即出成绩；支持随机打散顺序，每个单词需过一遍所有启用的题型
 - **智能出题**：
   - 带权重随机（错得多、忘得快的词优先）
   - 接入艾宾浩斯遗忘曲线（1 / 2 / 6 / 31 天节点）
@@ -106,10 +106,12 @@ flutter run -d web-server --web-port=5000
 ```bash
 # Web 版
 flutter build web --release
-npx wrangler pages deploy build/web --project-name=cixian
 
 # Android 版
 flutter build apk --release --split-per-abi
+
+# 自动化部署（推送到 GitHub 自动触发 Actions 部署至 Netlify / Cloudflare）
+git push origin main
 ```
 
 ### 项目结构
@@ -162,6 +164,11 @@ web/
 ---
 
 ## 更新日志
+
+### v0.12.3
+- 许可证迁移至 MulanPSL-2.0（木兰宽松许可证，第2版）
+- 每日学习新增“全题型”模式：随机打散顺序，每个单词需过一遍所有已启用的题型
+- 升级 Flutter 及 Gradle/AGP 工具链，修复兼容性问题
 
 ### v0.12.2
 - 自动检测设备 ABI，下载对应架构的 APK
@@ -222,7 +229,9 @@ web/
 
 ## 开源许可
 
-本项目基于 **Apache License 2.0** 开源，详见 [LICENSE](LICENSE)。
+本项目自 **v0.12.3** 起基于 **木兰宽松许可证，第2版（MulanPSL-2.0）** 开源，详见 [LICENSE](LICENSE)。
+
+**v0.12.2 及之前的版本**继续适用 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)。
 
 词书内容仅用于个人学习参考，版权归原出版方所有。如权利人认为侵权，请联系删除。
 

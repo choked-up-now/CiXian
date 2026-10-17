@@ -1,5 +1,5 @@
 // Copyright 2026 choked-up-now
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MulanPSL-2.0
 
 /// 艾宾浩斯遗忘曲线
 /// 关键节点（天级）：

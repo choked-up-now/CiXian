@@ -1,5 +1,5 @@
 // Copyright 2026 choked-up-now
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MulanPSL-2.0
 
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,5 +1,5 @@
 // Copyright 2026 choked-up-now
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MulanPSL-2.0
 
 import 'package:flutter/material.dart';
 import 'dart:math';
@@ -104,49 +104,71 @@ class _DailyLearningScreenState extends State<DailyLearningScreen> {
     final uniqueMeanings = words.map((e) => e.meaning).toSet().toList();
     final uniqueWords = words.map((e) => e.word).toSet().toList();
 
-    _questions = selected.map((idx) {
+    // 每个单词 × 每个启用的题型，全部展开
+    final allQuestions = <_Question>[];
+    for (final idx in selected) {
       final word = words[idx];
-      final type = enabledTypes[random.nextInt(enabledTypes.length)];
+      for (final type in enabledTypes) {
+        if (type == QuestionType.zhToSpell) {
+          allQuestions.add(_Question(
+            word: word,
+            wordIndex: idx,
+            type: type,
+            options: const [],
+            correctIndex: -1,
+          ));
+          continue;
+        }
 
-      if (type == QuestionType.zhToSpell) {
-        return _Question(
+        String correct;
+        List<String> pool;
+
+        switch (type) {
+          case QuestionType.enToZh:
+          case QuestionType.listenToZh:
+            correct = word.meaning;
+            pool = uniqueMeanings.where((m) => m != correct).toList();
+            break;
+          case QuestionType.zhToEn:
+          case QuestionType.listenToEn:
+            correct = word.word;
+            pool = uniqueWords.where((w) => w != correct).toList();
+            break;
+          default:
+            correct = word.meaning;
+            pool = uniqueMeanings.where((m) => m != correct).toList();
+        }
+
+        pool.shuffle(random);
+        final options = [correct, ...pool.take(3)]..shuffle(random);
+        allQuestions.add(_Question(
           word: word,
           wordIndex: idx,
           type: type,
-          options: const [],
-          correctIndex: -1,
-        );
+          options: options,
+          correctIndex: options.indexOf(correct),
+        ));
       }
+    }
 
-      String correct;
-      List<String> pool;
+    // 完全打散
+    allQuestions.shuffle(random);
 
-      switch (type) {
-        case QuestionType.enToZh:
-        case QuestionType.listenToZh:
-          correct = word.meaning;
-          pool = uniqueMeanings.where((m) => m != correct).toList();
-          break;
-        case QuestionType.zhToEn:
-        case QuestionType.listenToEn:
-          correct = word.word;
-          pool = uniqueWords.where((w) => w != correct).toList();
-          break;
-        default:
-          correct = word.meaning;
-          pool = uniqueMeanings.where((m) => m != correct).toList();
+    // 轻量去重：尽量避免同一单词的两道题相邻
+    for (int i = 1; i < allQuestions.length; i++) {
+      if (allQuestions[i].wordIndex == allQuestions[i - 1].wordIndex) {
+        for (int j = i + 1; j < allQuestions.length; j++) {
+          if (allQuestions[j].wordIndex != allQuestions[i - 1].wordIndex) {
+            final tmp = allQuestions[i];
+            allQuestions[i] = allQuestions[j];
+            allQuestions[j] = tmp;
+            break;
+          }
+        }
       }
+    }
 
-      pool.shuffle(random);
-      final options = [correct, ...pool.take(3)]..shuffle(random);
-      return _Question(
-        word: word,
-        wordIndex: idx,
-        type: type,
-        options: options,
-        correctIndex: options.indexOf(correct),
-      );
-    }).toList();
+    _questions = allQuestions;
 
     if (_questions.isEmpty) {
       setState(() {

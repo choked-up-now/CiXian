@@ -1,9 +1,15 @@
-name: Deploy Flutter Web to Netlify and Cloudflare
+name: Deploy to Netlify, Cloudflare and GitHub Pages
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # 允许在 GitHub 页面手动触发
+  workflow_dispatch:
+
+# 给 GitHub Pages 授权
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build-and-deploy:
@@ -22,14 +28,13 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Web
+      # --- 第一次构建：给 Netlify 和 Cloudflare 用（不带 base-href） ---
+      - name: Build Web for Netlify & Cloudflare
         run: flutter build web --release
         env:
-          # 国内镜像加速，防止下载超时
           FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
           PUB_HOSTED_URL: https://pub.flutter-io.cn
 
-      # ---------- 部署到 Netlify（纯前端托管）----------
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v3.0
         with:
@@ -41,10 +46,28 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
-      # ---------- 部署到 Cloudflare Pages（包含 Functions + D1）----------
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy build/web --project-name=cixian
+
+      # --- 第二次构建：专门给 GitHub Pages 用（带 base-href） ---
+      - name: Build Web for GitHub Pages
+        run: flutter build web --release --base-href /CiXian/
+        env:
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './build/web'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
