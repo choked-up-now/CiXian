@@ -11,6 +11,7 @@ import '../data/tts_service.dart';
 import '../data/apk_downloader.dart';
 import '../data/sync_manager.dart';
 import '../data/user_settings.dart';
+import 'webview_screen.dart'; // 引入内嵌网页组件
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -523,17 +524,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开：$e')),
-        );
+  // 统一处理的跳转方法
+  Future<void> _openUrl(String url, String title) async {
+    if (kIsWeb) {
+      final uri = Uri.parse(url);
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('无法打开：$e')),
+          );
+        }
       }
+      return;
     }
+
+    // 手机端使用内嵌 WebView
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WebViewScreen(url: url, title: title),
+      ),
+    );
   }
 
   @override
@@ -546,14 +560,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.help_outline),
             title: const Text('帮助中心'),
             subtitle: const Text('使用指南、常见问题'),
-            onTap: () => _openUrl('https://cixian.pages.dev/docs/'),
+            onTap: () => _openUrl('https://cixian.pages.dev/docs/', '帮助中心'),
           ),
           ListTile(
             leading: const Icon(Icons.feedback_outlined),
             title: const Text('反馈与建议'),
             subtitle: const Text('提交 Bug 或新功能建议'),
-            onTap: () =>
-                _openUrl('https://atomgit.com/choked-up-now/CiXian/issues'),
+            onTap: () => _openUrl(
+                'https://atomgit.com/choked-up-now/CiXian/issues', '反馈与建议'),
           ),
           const Divider(),
           ListTile(
@@ -624,12 +638,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.favorite),
             title: const Text('支持作者'),
             subtitle: const Text('爱发电 · 请作者喝杯奶茶'),
-            onTap: () => _openUrl('https://afdian.com/a/choked-up-now'),
+            onTap: () => _openUrl('https://afdian.com/a/choked-up-now', '支持作者'),
           ),
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              '词冼 CiXian\n一个极简背单词软件\n基于 Apache License 2.0 开源',
+              '词冼 CiXian\n一个极简背单词软件\n基于 MulanPSL-2.0 开源',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey, fontSize: 12),
             ),

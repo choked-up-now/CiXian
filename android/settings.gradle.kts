@@ -11,6 +11,10 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        // 👇 阿里云镜像
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -19,8 +23,10 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.1.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // 👇 必须降级到 8.11.1，才能配合 Gradle 8.14
+    id("com.android.application") version "8.11.1" apply false
+    // 👇 必须降级到 2.2.20
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
 }
 
 include(":app")
