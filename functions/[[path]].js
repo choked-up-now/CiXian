@@ -108,11 +108,24 @@ async function handleSyncUpload(request, env) {
   const body = await request.json();
   const syncCode = (body.sync_code || '').toString().trim().toUpperCase();
   const data = body.data;
+  const clientUpdatedAt = Number(body.client_updated_at || 0);
 
   if (!syncCode || !data) return json({ error: '参数不完整' }, 400);
 
   const user = await findUserByCode(env, syncCode);
   if (!user) return json({ error: '同步码无效' }, 404);
+
+  // 乐观锁：旧客户端不得覆盖云端较新的进度。
+  // 不传 client_updated_at 的旧版本客户端跳过校验，保持兼容。
+  if (clientUpdatedAt > 0) {
+    const prev = await env.DB
+      .prepare('SELECT updated_at FROM progress WHERE user_id = ?')
+      .bind(user.id)
+      .first();
+    if (prev && clientUpdatedAt < Number(prev.updated_at || 0)) {
+      return json({ ok: false, reason: 'stale' }, 409);
+    }
+  }
 
   const now = Date.now();
   await env.DB

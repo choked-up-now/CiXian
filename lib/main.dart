@@ -42,17 +42,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _init() async {
-    // 云同步：如果已开启，启动时下载
+    // 云同步：失败或超时都不能阻塞进入首页
     try {
-      await SyncManager.downloadAndApply();
-    } catch (_) {}
-
+      await SyncManager.downloadAndApply()
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {
+      // 下次启动或手动同步会重试
+    }
+    if (!mounted) return;
     await _loadBook();
   }
 
   Future<void> _loadBook() async {
     await WordbookStorage.ensureDefaultBook();
     final book = await WordbookStorage.loadCurrent();
+    if (!mounted) return;
     setState(() {
       _book = book;
       _loading = false;

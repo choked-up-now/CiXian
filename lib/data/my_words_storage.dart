@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 import 'dart:convert';
+import 'dart:math' show max;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/word.dart';
 
@@ -260,7 +261,69 @@ class MyWordsStorage {
     await prefs.setString(_key, jsonEncode(all));
   }
 
+  /// 与远端逐词合并（日常同步用），保留较新记录，收藏取「或」。
+  /// 两侧存储模式不一致时跳过该词书，避免下标错位。
+  static Future<void> mergeRemote(Map<String, dynamic> remote) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    final local = raw != null
+        ? jsonDecode(raw) as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    for (final entry in remote.entries) {
+      final bookId = entry.key;
+      final rBook = entry.value as Map<String, dynamic>;
+      final lBook = (local[bookId] as Map<String, dynamic>?) ?? {};
+      final modeKey = rBook.containsKey('1') ? '1' : '0';
+      final mode = modeKey == '1' ? 1 : 0;
+
+      // 本地已有数据但模式不同：不硬合，交给 switchMode 统一后再同步
+      if (lBook.isNotEmpty && !lBook.containsKey(modeKey)) continue;
+
+      final rList = ((rBook[modeKey] as List<dynamic>?) ?? []).cast<String>();
+      final lList = ((lBook[modeKey] as List<dynamic>?) ?? []).cast<String>();
+      final merged = <int, WordRecord>{};
+
+      void put(String s, int i) {
+        final r = WordRecord.parse(s, mode: mode, fallbackIndex: i);
+        final old = merged[r.index];
+        if (old == null) {
+          merged[r.index] = r;
+          return;
+        }
+        final winner = _isNewer(r, old) ? r : old;
+        // 收藏不带时间戳，取「或」，避免被较新但没收藏的一侧抹掉
+        merged[r.index] = winner.copyWith(favorite: old.favorite || r.favorite);
+      }
+
+      for (var i = 0; i < lList.length; i++) put(lList[i], i);
+      for (var i = 0; i < rList.length; i++) put(rList[i], i);
+
+      final out = <String>[];
+      if (mode == 1) {
+        final maxIdx = merged.isEmpty ? -1 : merged.keys.reduce(max);
+        for (var i = 0; i <= maxIdx; i++) {
+          out.add((merged[i] ?? WordRecord.empty(i)).serialize(mode: 1));
+        }
+      } else {
+        for (final i in (merged.keys.toList()..sort())) {
+          out.add(merged[i]!.serialize(mode: 0));
+        }
+      }
+      local[bookId] = {modeKey: out};
+    }
+    await prefs.setString(_key, jsonEncode(local));
+  }
+
+  static bool _isNewer(WordRecord a, WordRecord b) {
+    if (a.lastReview != b.lastReview) return a.lastReview > b.lastReview;
+    if (a.reviewCount != b.reviewCount) return a.reviewCount > b.reviewCount;
+    if (a.wrongCount != b.wrongCount) return a.wrongCount > b.wrongCount;
+    return false;
+  }
+
   // ============ 工具 ============
+
 
   static void _upsert(List<WordRecord> records, int index,
       WordRecord Function(WordRecord) update) {

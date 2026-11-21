@@ -5,9 +5,10 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_client.dart';
+import 'config.dart';
 
 class VersionChecker {
   static const String _owner = 'choked-up-now';
@@ -34,7 +35,7 @@ class VersionChecker {
     try {
       final acceptPre = await isAcceptPreRelease();
       final url = acceptPre ? _allApiUrl : _latestApiUrl;
-      final response = await http.get(Uri.parse(url));
+      final response = await ApiClient.get(Uri.parse(url));
 
       if (response.statusCode != 200) {
         return VersionCheckResult(error: '无法获取版本信息 (${response.statusCode})');
@@ -95,7 +96,8 @@ class VersionChecker {
     for (final asset in assets) {
       final name = asset['name'] as String? ?? '';
       final url = asset['browser_download_url'] as String? ?? '';
-      if (name.endsWith('.apk') && url.isNotEmpty) {
+      // 只接受可信域名下的 .apk，防止 release 被投毒
+      if (name.endsWith('.apk') && ApkPolicy.isTrusted(url)) {
         apks[name] = url;
       }
     }

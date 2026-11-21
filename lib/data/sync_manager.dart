@@ -75,9 +75,11 @@ class SyncManager {
     if (syncCode == null) return false;
 
     try {
-      final data = await _collectData();
-      await CloudSync.upload(syncCode, data);
       final prefs = await SharedPreferences.getInstance();
+      // 上次成功同步时间作为乐观锁版本号，服务端据此拒绝旧数据覆盖
+      final clientUpdatedAt = prefs.getInt(_lastSyncKey) ?? 0;
+      final data = await _collectData();
+      await CloudSync.upload(syncCode, data, clientUpdatedAt);
       await prefs.setInt(_lastSyncKey, DateTime.now().millisecondsSinceEpoch);
       return true;
     } catch (_) {
@@ -113,7 +115,14 @@ class SyncManager {
   static Future<void> _applyData(Map<String, dynamic> data) async {
     final mw = data['my_words'] as Map<String, dynamic>?;
     if (mw != null) {
-      await MyWordsStorage.importAll(mw);
+      final local = await MyWordsStorage.exportAll();
+      if (local.isEmpty) {
+        // 首次绑定同步码，本地本来就空，整包导入即可
+        await MyWordsStorage.importAll(mw);
+      } else {
+        // 日常同步：逐词合并，不再整包覆盖
+        await MyWordsStorage.mergeRemote(mw);
+      }
     }
 
     final ttsRate = data['tts_rate'];
