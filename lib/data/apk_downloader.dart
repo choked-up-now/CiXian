@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'config.dart';
+import '../config.dart';
 
 class ApkDownloader {
   /// 下载 APK 并调起系统安装器。

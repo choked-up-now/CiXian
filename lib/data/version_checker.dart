@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
-import 'config.dart';
+import '../config.dart';
 
 class VersionChecker {
   static const String _owner = 'choked-up-now';

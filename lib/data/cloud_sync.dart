@@ -3,7 +3,7 @@
 
 import 'dart:convert';
 import 'api_client.dart';
-import 'config.dart';
+import '../config.dart';
 
 class CloudSync {
   static const String _baseUrl = AppConfig.baseUrl;
