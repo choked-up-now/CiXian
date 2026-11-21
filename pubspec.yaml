@@ -1,7 +1,7 @@
 name: cixian
 description: "词冼 - 背单词软件"
 publish_to: 'none'
-version: 0.12.3+21 # 顺便把版本号也改了
+version: 0.13.0+22
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
