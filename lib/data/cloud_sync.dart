@@ -3,9 +3,10 @@
 
 import 'dart:convert';
 import 'api_client.dart';
+import 'config.dart';
 
 class CloudSync {
-  static const String _baseUrl = 'https://cixian.pages.dev';
+  static const String _baseUrl = AppConfig.baseUrl;
 
   /// 注册新用户，返回 {user_id, sync_code}
   static Future<Map<String, dynamic>> register() async {

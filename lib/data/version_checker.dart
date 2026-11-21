@@ -15,9 +15,9 @@ class VersionChecker {
   static const String _repo = 'CiXian';
 
   static const String _latestApiUrl =
-      'https://api.atomgit.com/api/v5/repos/$_owner/$_repo/releases/latest';
+      '${AppConfig.atomgitApi}/$_owner/$_repo/releases/latest';
   static const String _allApiUrl =
-      'https://api.atomgit.com/api/v5/repos/$_owner/$_repo/releases';
+      '${AppConfig.atomgitApi}/$_owner/$_repo/releases';
 
   static const String _acceptPreReleaseKey = 'accept_prerelease';
 
@@ -43,7 +43,7 @@ class VersionChecker {
 
       String? latestVersion;
       String apkUrl = '';
-      const releaseUrl = 'https://atomgit.com/$_owner/$_repo/releases';
+      const releaseUrl = AppConfig.releasePageUrl;
 
       if (acceptPre) {
         final list = jsonDecode(response.body) as List<dynamic>;
