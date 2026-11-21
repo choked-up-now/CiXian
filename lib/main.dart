@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'data/wordbook_storage.dart';
 import 'data/sync_manager.dart';
-import 'models/word.dart';
 import 'screens/word_list_screen.dart';
 
 void main() {

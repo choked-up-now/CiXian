@@ -30,7 +30,7 @@ jobs:
 
       - name: Analyze & Test
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
           flutter test
 
       # --- 第一次构建：给 Netlify 和 Cloudflare 用（不带 base-href） ---

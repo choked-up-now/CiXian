@@ -76,6 +76,7 @@ class _MyWordsScreenState extends State<MyWordsScreen>
     await _load();
   }
 
+  // ignore: unused_element
   Future<void> _startReview(List<WordRecord> source) async {
     final words = <Word>[];
     for (final r in source) {

@@ -296,8 +296,12 @@ class MyWordsStorage {
         merged[r.index] = winner.copyWith(favorite: old.favorite || r.favorite);
       }
 
-      for (var i = 0; i < lList.length; i++) put(lList[i], i);
-      for (var i = 0; i < rList.length; i++) put(rList[i], i);
+      for (var i = 0; i < lList.length; i++) {
+        put(lList[i], i);
+      }
+      for (var i = 0; i < rList.length; i++) {
+        put(rList[i], i);
+      }
 
       final out = <String>[];
       if (mode == 1) {
