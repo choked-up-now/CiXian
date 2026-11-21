@@ -1,27 +1,19 @@
 # 补丁清单
 
-脚本：`apply_patches.py` · 阶段：p0 · 模式：原地修改
+脚本：`apply_patches.py` · 阶段：p1 · 模式：原地修改
 
 | 阶段 | 文件 | 操作 | 说明 |
 |---|---|---|---|
-| P0 | `lib/data/api_client.dart` | 新增 | 新增统一网络层（10s 超时） |
-| P0 | `lib/config.dart` | 新增 | 新增全局配置与 APK 来源白名单 |
-| P0 | `lib/data/my_words_storage.dart` | 替换 | 引入 dart:math（mergeRemote 需要 max） |
-| P0 | `lib/data/my_words_storage.dart` | 替换 | 新增 mergeRemote / _isNewer |
-| P0 | `lib/data/sync_manager.dart` | 替换 | uploadNow 携带上次同步时间（乐观锁） |
-| P0 | `lib/data/sync_manager.dart` | 替换 | _applyData 改成逐词合并 |
-| P0 | `lib/data/cloud_sync.dart` | 替换 | http → ApiClient |
-| P0 | `lib/data/cloud_sync.dart` | 替换 | register 走统一超时 |
-| P0 | `lib/data/cloud_sync.dart` | 替换 | bind 走统一超时 |
-| P0 | `lib/data/cloud_sync.dart` | 替换 | download 走统一超时 |
-| P0 | `lib/data/cloud_sync.dart` | 替换 | upload 携带 client_updated_at 并处理 409 |
-| P0 | `lib/data/version_checker.dart` | 替换 | import 换成 ApiClient + config |
-| P0 | `lib/data/version_checker.dart` | 替换 | 版本检查走统一超时 |
-| P0 | `lib/data/version_checker.dart` | 替换 | APK asset 增加来源白名单 |
-| P0 | `lib/data/apk_downloader.dart` | 替换 | 引入 config.dart |
-| P0 | `lib/data/apk_downloader.dart` | 替换 | 下载前二次校验来源 |
-| P0 | `lib/main.dart` | 替换 | 同步加超时兜底 + mounted 检查，杜绝白屏 |
-| P0 | `functions/[[path]].js` | 替换 | 服务端乐观锁：旧客户端不得覆盖新进度 |
+| P1 | `schema.sql` | 新增 | D1 建表脚本（仓库原本没有） |
+| P1 | `wrangler.toml` | 新增 | D1 绑定配置（仓库原本没有） |
+| P1 | `NOTICE` | 新增 | 许可证分片适用与部署配置说明 |
+| P1 | `test/widget_test.dart` | 替换 | 模板计数器测试 → 3 组真实纯函数测试 |
+| P1 | `.github/workflows/deploy-web.yml` | 替换 | CI 增加 analyze + test 门禁 |
+| P1 | `.wrangler/cache/pages.json` | 删除 | 移除误提交的真实 Cloudflare account_id（.gitignore 已有规则，需 git rm --cached） |
+| P1 | `README.md` | 替换 | 勘误：删除未适配的 HarmonyOS 4.x 声明 |
+| P1 | `README.md` | 替换 | 勘误：删除未适配的 HarmonyOS NEXT 声明 |
+| P1 | `README.md` | 替换 | 勘误：内置词书实际只有 1 本 |
+| P1 | `README.md` | 替换 | 勘误：简介不再声称内置多版本 |
 
 ## 怎么跑
 

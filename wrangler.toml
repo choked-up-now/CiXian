@@ -1,0 +1,13 @@
+# 词冼 CiXian · Cloudflare Pages / D1 本地配置
+# 把 REPLACE_WITH_YOUR_D1_DATABASE_ID 换成控制台里的真实 database_id。
+# 注意：Pages 项目本身的 D1 绑定仍需在 Cloudflare 控制台
+#       Settings → Functions → D1 database bindings 里配一次（binding 名必须是 DB）。
+
+name = "cixian"
+pages_build_output_dir = "build/web"
+compatibility_date = "2026-11-21"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cixian"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

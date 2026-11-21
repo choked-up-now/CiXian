@@ -1,0 +1,24 @@
+词冼 CiXian · 许可证与内容说明
+================================
+
+许可证分片适用
+--------------
+* v0.12.3 及之后：木兰宽松许可证，第 2 版（MulanPSL-2.0），见 LICENSE。
+* v0.12.2 及之前：Apache License 2.0。
+
+当前仓库所有源文件头部统一标注 MulanPSL-2.0。若需分发 v0.12.2 及更早的
+历史版本，请按对应 tag 当时的许可证文本处理；不要直接把现在的头文件
+套用到旧版本上。
+
+第三方与内容
+------------
+* 词书 JSON 内容仅用于个人学习参考，版权归原出版方所有。
+  权利人认为侵权的，请联系仓库维护者删除。
+* 依赖包的许可证以其各自 pub.dev / 上游仓库声明为准。
+
+部署配置
+--------
+* CI 依赖 5 个 secrets：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID、
+  NETLIFY_AUTH_TOKEN、NETLIFY_SITE_ID、GITHUB_TOKEN（最后一个自动注入）。
+  接手后需在仓库 Settings → Secrets 重新配置。
+* D1 database_id 见 wrangler.toml，建表语句见 schema.sql。

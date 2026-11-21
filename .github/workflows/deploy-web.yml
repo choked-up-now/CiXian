@@ -28,6 +28,11 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Analyze & Test
+        run: |
+          flutter analyze
+          flutter test
+
       # --- 第一次构建：给 Netlify 和 Cloudflare 用（不带 base-href） ---
       - name: Build Web for Netlify & Cloudflare
         run: flutter build web --release

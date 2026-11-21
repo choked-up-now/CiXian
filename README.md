@@ -1,6 +1,6 @@
 # 词冼 CiXian
 
-> 一个极简的背单词软件，内置多版本教材词书，支持云同步与自定义词书。
+> 一个极简的背单词软件，内置词书 + 词书市场，支持云同步与自定义词书。
 
 [![License](https://img.shields.io/badge/license-MulanPSL--2.0-orange.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.2-02569B?logo=flutter)](https://flutter.dev)
@@ -17,7 +17,7 @@
 
 ## 功能特性
 
-- **多版本教材词书**：外研版、译林版、人教版、北师大版（九年级上册）
+- **内置词书**：外研版九年级上册（237 词）；更多教材词书从「词书市场」下载，也可导入自定义 JSON
 - **五种题型**：英选中、中选英、看中译英、听音选意、听音选词，可自由开关
 - **每日学习**：新词 + 旧词混合，答完即出成绩；支持随机打散顺序，每个单词需过一遍所有启用的题型
 - **智能出题**：
@@ -35,13 +35,13 @@
 
 ## 下载与访问
 
-### Android / HarmonyOS 4.x
+### Android
 
 前往 [Releases](https://atomgit.com/choked-up-now/CiXian/releases) 下载最新版 `app-arm64-v8a-release.apk`。
 
 > 安装时请允许"未知来源应用"。
 
-### iPhone / HarmonyOS NEXT / 其他设备
+### iPhone / 其他设备
 
 用浏览器打开网页版：
 
